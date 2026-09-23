@@ -17,6 +17,7 @@ import {
   Unlock, 
   Search, 
   Flame,
+  Star,
   KeyRound,
   Eye,
   EyeOff,
@@ -30,8 +31,113 @@ import {
   Monitor,
   Smartphone,
   Sliders,
-  FileText
+  FileText,
+  Pencil,
+  Laptop,
+  Cpu,
+  HardDrive,
+  Printer,
+  Headphones,
+  Tv,
+  Zap,
+  Plug,
+  Wrench,
+  Hammer,
+  Drill,
+  Construction,
+  Home,
+  Armchair,
+  Lamp,
+  Bed,
+  Utensils,
+  CookingPot,
+  ChefHat,
+  Coffee,
+  Refrigerator,
+  Microwave,
+  Boxes,
+  Shirt,
+  Dumbbell,
+  Car,
+  Dog
 } from 'lucide-react';
+
+export const CATEGORY_ICON_GROUPS = [
+  {
+    group: 'Informática & Computação',
+    options: [
+      { value: 'Laptop', label: 'Laptop / Notebook', icon: Laptop },
+      { value: 'Monitor', label: 'Monitor & Telas', icon: Monitor },
+      { value: 'Cpu', label: 'Hardware / Processador', icon: Cpu },
+      { value: 'HardDrive', label: 'Armazenamento & SSD', icon: HardDrive },
+      { value: 'Printer', label: 'Impressoras & Periféricos', icon: Printer },
+    ],
+  },
+  {
+    group: 'Eletrônicos & Áudio',
+    options: [
+      { value: 'Smartphone', label: 'Smartphone / Celular', icon: Smartphone },
+      { value: 'Headphones', label: 'Fones de Ouvido & Áudio', icon: Headphones },
+      { value: 'Tv', label: 'TV & Vídeo', icon: Tv },
+      { value: 'Zap', label: 'Eletrônicos & Energia', icon: Zap },
+      { value: 'Plug', label: 'Cabos & Carregadores', icon: Plug },
+    ],
+  },
+  {
+    group: 'Ferramentas & Construção',
+    options: [
+      { value: 'Wrench', label: 'Chave Inglesa / Ferramentas', icon: Wrench },
+      { value: 'Hammer', label: 'Martelo & Obras', icon: Hammer },
+      { value: 'Drill', label: 'Furadeira & Elétricas', icon: Drill },
+      { value: 'Construction', label: 'Construção & Reparos', icon: Construction },
+    ],
+  },
+  {
+    group: 'Casa & Decoração',
+    options: [
+      { value: 'Home', label: 'Casa & Conforto', icon: Home },
+      { value: 'Armchair', label: 'Móveis & Poltrona', icon: Armchair },
+      { value: 'Lamp', label: 'Iluminação & Luminárias', icon: Lamp },
+      { value: 'Bed', label: 'Cama, Mesa & Banho', icon: Bed },
+    ],
+  },
+  {
+    group: 'Cozinha & Eletroportáteis',
+    options: [
+      { value: 'Utensils', label: 'Talheres & Utensílios', icon: Utensils },
+      { value: 'CookingPot', label: 'Panelas & Cocção', icon: CookingPot },
+      { value: 'ChefHat', label: 'Gourmet & Confeitaria', icon: ChefHat },
+      { value: 'Coffee', label: 'Cafeteira & Bebidas', icon: Coffee },
+      { value: 'Refrigerator', label: 'Geladeira & Refrigeração', icon: Refrigerator },
+      { value: 'Microwave', label: 'Micro-ondas & Eletros', icon: Microwave },
+    ],
+  },
+  {
+    group: 'Outras Categorias Populares',
+    options: [
+      { value: 'Boxes', label: 'Organizadores & Caixas', icon: Boxes },
+      { value: 'Package', label: 'Embalagens / Geral', icon: Package },
+      { value: 'Sparkles', label: 'Beleza & Cuidados', icon: Sparkles },
+      { value: 'Flame', label: 'Achadinhos & Promoções', icon: Flame },
+      { value: 'Shirt', label: 'Moda & Vestuário', icon: Shirt },
+      { value: 'Dumbbell', label: 'Fitness & Esportes', icon: Dumbbell },
+      { value: 'Car', label: 'Automotivo & Carro', icon: Car },
+      { value: 'Dog', label: 'Pets & Animais', icon: Dog },
+    ],
+  },
+];
+
+export const renderCategoryIcon = (iconName?: string, className = 'w-4 h-4') => {
+  if (!iconName) return <Package className={className} />;
+  for (const grp of CATEGORY_ICON_GROUPS) {
+    const opt = grp.options.find((o) => o.value.toLowerCase() === iconName.toLowerCase());
+    if (opt) {
+      const IconComp = opt.icon;
+      return <IconComp className={className} />;
+    }
+  }
+  return <Package className={className} />;
+};
 import { Category, Product, StoreType, Banner, SiteConfig } from '../types';
 import { 
   addProduct, 
@@ -51,17 +157,21 @@ import {
   getStoredBanners,
   saveBanners,
   getStoredSiteConfig,
-  saveStoredSiteConfig
+  saveStoredSiteConfig,
+  reorderProductPosition
 } from '../services/storage';
 import { StoreLogo } from './StoreLogo';
 import {
   addProductToCloud,
   updateProductInCloud,
+  swapProductOrdersInCloud,
   deleteProductFromCloud,
   saveBannersToCloud,
   saveCategoriesToCloud,
   deleteCategoryFromCloud,
-  saveSiteConfigToCloud
+  saveSiteConfigToCloud,
+  fetchAdminPasswordFromCloud,
+  saveAdminPasswordToCloud
 } from '../services/firebaseService';
 import { BannerGuideModal } from './BannerGuideModal';
 
@@ -84,16 +194,6 @@ const BADGE_PRESETS = [
   'Viral no TikTok',
   'Tendência',
   'Garantia Loja',
-];
-
-// Sample preset photos for quick product addition
-const PRESET_IMAGES = [
-  { label: 'Organizador Giratório Acrílico', url: '/src/assets/images/organizador_acrilico_giratorio_1790120510574.jpg' },
-  { label: 'Mini Processador Portátil', url: '/src/assets/images/mini_processador_portatil_1790120527360.jpg' },
-  { label: 'Umidificador Efeito Chama', url: '/src/assets/images/umidificador_chama_led_1790120545471.jpg' },
-  { label: 'Luminária Minimalista Indução', url: '/src/assets/images/luminaria_inducao_minimalista_1790120556704.jpg' },
-  { label: 'Dispenser Automático Espuma', url: '/src/assets/images/dispenser_sensor_espuma_1790120594683.jpg' },
-  { label: 'Kit Potes Herméticos Bambu', url: '/src/assets/images/kit_potes_hermeticos_1790120605012.jpg' },
 ];
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -143,41 +243,63 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     highlights: [''] as string[],
     badges: ['Destaque'] as string[],
     isFeatured: true,
+    rating: 4.9,
+    reviewCount: 384,
+    clicksCount: 1420,
+    order: products.length + 1,
   });
 
-  // Category creation state
+  // Category creation & edit state
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('Package');
 
-  // Stats calculation
-  const totalClicks = products.reduce((acc, p) => acc + (p.clicksCount || 0), 0);
-  const topProducts = [...products].sort((a, b) => (b.clicksCount || 0) - (a.clicksCount || 0)).slice(0, 5);
+  // Stats calculation (100% Números Reais de Visitantes)
+  const totalRealClicks = products.reduce((acc, p) => acc + (p.realClicksCount || 0), 0);
+  const totalRealViews = products.reduce((acc, p) => acc + (p.realViewsCount || 0), 0);
+  const topProducts = [...products]
+    .sort((a, b) => (b.realClicksCount || 0) - (a.realClicksCount || 0))
+    .slice(0, 5);
 
   // Handle Login Action
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
+    setIsLoggingIn(true);
 
-    const isValid = verifyAdminCredentials(loginUser, loginPassword);
-    if (isValid) {
-      setAdminSession(true);
-      setIsAdminLoggedIn(true);
-      setLoginPassword('');
-      onShowToast('Login realizado com sucesso! Bem-vindo ao painel.');
-    } else {
-      setLoginError('Credenciais incorretas. Verifique o usuário e a senha informados.');
+    try {
+      // 1. Check with local storage credentials
+      let isValid = verifyAdminCredentials(loginUser, loginPassword);
+
+      // 2. If it fails, fetch the true cloud password directly from Firestore (handles multi-device / incognito)
+      if (!isValid) {
+        const cloudPass = (await fetchAdminPasswordFromCloud()).trim();
+        const trimmedUser = loginUser.trim().toLowerCase();
+        const trimmedPass = loginPassword.trim();
+        const validUser = (trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase()) || 
+                          (trimmedUser === 'admin@achadosdodia.com.br');
+        if (validUser && trimmedPass === cloudPass) {
+          isValid = true;
+          // Synchronize local password immediately
+          setAdminPassword(cloudPass);
+        }
+      }
+
+      if (isValid) {
+        setAdminSession(true);
+        setIsAdminLoggedIn(true);
+        setLoginPassword('');
+        onShowToast('Login realizado com sucesso! Bem-vindo ao painel.');
+      } else {
+        setLoginError('Credenciais incorretas. Verifique o usuário e a senha informados.');
+      }
+    } catch {
+      setLoginError('Erro ao validar acesso. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsLoggingIn(false);
     }
-  };
-
-  // Quick 1-click test login with default credentials
-  const handleQuickDefaultLogin = () => {
-    const currentPass = getAdminPassword();
-    setLoginUser(DEFAULT_ADMIN_CONFIG.username);
-    setLoginPassword(currentPass);
-    setAdminSession(true);
-    setIsAdminLoggedIn(true);
-    setLoginError(null);
-    onShowToast(`Conectado como ${DEFAULT_ADMIN_CONFIG.username}!`);
   };
 
   // Logout Action
@@ -189,43 +311,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Handle Password Change Action
-  const handlePasswordChangeSubmit = (e: React.FormEvent) => {
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordChangeError(null);
     setPasswordChangeSuccess(null);
+    setIsChangingPassword(true);
 
-    const currentSavedPass = getAdminPassword();
-    if (currentPasswordInput !== currentSavedPass) {
-      setPasswordChangeError('A senha atual informada está incorreta.');
-      return;
+    try {
+      // Fetch latest cloud password to verify current password
+      const currentSavedPass = (await fetchAdminPasswordFromCloud()).trim();
+      if (currentPasswordInput.trim() !== currentSavedPass) {
+        setPasswordChangeError('A senha atual informada está incorreta.');
+        return;
+      }
+
+      const trimmedNew = newPasswordInput.trim();
+      if (trimmedNew.length < 4) {
+        setPasswordChangeError('A nova senha deve possuir no mínimo 4 caracteres.');
+        return;
+      }
+
+      if (trimmedNew !== confirmPasswordInput.trim()) {
+        setPasswordChangeError('A confirmação da nova senha não coincide.');
+        return;
+      }
+
+      // Save new password to LocalStorage AND to Firestore Cloud
+      const savedOk = await saveAdminPasswordToCloud(trimmedNew);
+      if (savedOk) {
+        setAdminPassword(trimmedNew);
+        setPasswordChangeSuccess('Senha alterada com sucesso! Ela foi salva na nuvem e será exigida em todos os seus acessos futuros.');
+        setCurrentPasswordInput('');
+        setNewPasswordInput('');
+        setConfirmPasswordInput('');
+        onShowToast('Senha de administrador atualizada e salva na nuvem!');
+      } else {
+        setPasswordChangeError('Não foi possível sincronizar na nuvem. Verifique sua conexão.');
+      }
+    } catch {
+      setPasswordChangeError('Erro ao alterar senha. Tente novamente.');
+    } finally {
+      setIsChangingPassword(false);
     }
-
-    if (newPasswordInput.trim().length < 4) {
-      setPasswordChangeError('A nova senha deve possuir no mínimo 4 caracteres.');
-      return;
-    }
-
-    if (newPasswordInput !== confirmPasswordInput) {
-      setPasswordChangeError('A confirmação da nova senha não coincide.');
-      return;
-    }
-
-    // Save new password
-    setAdminPassword(newPasswordInput);
-    setPasswordChangeSuccess('Senha alterada com sucesso! Guarde sua nova senha com segurança.');
-    setCurrentPasswordInput('');
-    setNewPasswordInput('');
-    setConfirmPasswordInput('');
-    onShowToast('Senha de administrador atualizada!');
   };
 
   // Restore Default Password Action
-  const handleRestoreDefaultPassword = () => {
+  const handleRestoreDefaultPassword = async () => {
     if (window.confirm(`Deseja restaurar a senha de administrador para a padrão ("${DEFAULT_ADMIN_CONFIG.defaultPassword}")?`)) {
+      await saveAdminPasswordToCloud(DEFAULT_ADMIN_CONFIG.defaultPassword);
       setAdminPassword(DEFAULT_ADMIN_CONFIG.defaultPassword);
       setPasswordChangeSuccess(`Senha redefinida para o padrão de fábrica: "${DEFAULT_ADMIN_CONFIG.defaultPassword}"`);
       setPasswordChangeError(null);
-      onShowToast('Senha padrão restaurada!');
+      onShowToast('Senha padrão restaurada na nuvem!');
     }
   };
 
@@ -262,6 +401,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const resetForm = () => {
     setEditingProductId(null);
+    const nextOrder = products.reduce((max, p) => Math.max(max, p.order || 0), 0) + 1;
     setFormData({
       title: '',
       subtitle: '',
@@ -273,6 +413,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       highlights: [''],
       badges: ['Destaque'],
       isFeatured: true,
+      rating: 4.9,
+      reviewCount: 384,
+      clicksCount: 1420,
+      order: nextOrder,
     });
   };
 
@@ -289,6 +433,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       highlights: p.highlights && p.highlights.length > 0 ? [...p.highlights] : [''],
       badges: p.badges && p.badges.length > 0 ? [...p.badges] : [],
       isFeatured: p.isFeatured,
+      rating: p.rating !== undefined ? p.rating : 4.9,
+      reviewCount: p.reviewCount !== undefined ? p.reviewCount : 384,
+      clicksCount: p.clicksCount !== undefined ? p.clicksCount : 1420,
+      order: p.order || 1,
     });
     setActiveTab('new-product');
   };
@@ -323,35 +471,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       : ['https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80'];
 
     if (editingProductId) {
+      const desiredOrder = Number(formData.order) || 1;
+      const reorderRes = reorderProductPosition(editingProductId, desiredOrder);
+      if (reorderRes.swappedProduct) {
+        swapProductOrdersInCloud(
+          { id: editingProductId, order: desiredOrder },
+          { id: reorderRes.swappedProduct.id, order: reorderRes.swappedProduct.order || 1 }
+        );
+      } else {
+        swapProductOrdersInCloud({ id: editingProductId, order: desiredOrder });
+      }
+
       const updates = {
         title: formData.title,
         subtitle: formData.subtitle,
         store: formData.store,
         affiliateUrl: formData.affiliateUrl,
         category: formData.category,
+        order: desiredOrder,
         images: finalImages,
         description: formData.description,
         highlights: cleanHighlights,
         badges: formData.badges,
         isFeatured: formData.isFeatured,
+        rating: Number(formData.rating) || 4.9,
+        reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
+        clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
       };
       updateProduct(editingProductId, updates);
       updateProductInCloud(editingProductId, updates);
       onShowToast('Produto atualizado com sucesso!');
     } else {
+      const desiredOrder = Number(formData.order) || (products.length + 1);
       const created = addProduct({
         title: formData.title,
         subtitle: formData.subtitle,
         store: formData.store,
         affiliateUrl: formData.affiliateUrl,
         category: formData.category,
+        order: desiredOrder,
         images: finalImages,
         description: formData.description || 'Descrição detalhada do achadinho.',
         highlights: cleanHighlights.length > 0 ? cleanHighlights : ['Produto verificado', 'Envio rápido'],
         badges: formData.badges,
         isFeatured: formData.isFeatured,
-        rating: 4.8,
-        reviewCount: 150,
+        rating: Number(formData.rating) || 4.9,
+        reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
+        clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
         verifiedDeal: true,
       });
       addProductToCloud(created);
@@ -378,14 +544,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormData({ ...formData, images: updated.length ? updated : [''] });
   };
 
-  const handlePickPresetImage = (url: string) => {
-    if (formData.images.length === 1 && formData.images[0] === '') {
-      setFormData({ ...formData, images: [url] });
-    } else {
-      setFormData({ ...formData, images: [...formData.images, url] });
-    }
-  };
-
   const handleAddHighlightField = () => {
     setFormData({ ...formData, highlights: [...formData.highlights, ''] });
   };
@@ -409,23 +567,92 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleCreateCategory = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCatName.trim()) return;
+  const handleStartEditCategory = (cat: Category) => {
+    setEditingCategoryId(cat.id);
+    setNewCatName(cat.name);
+    setNewCatIcon(cat.iconName || 'Package');
+    const formEl = document.getElementById('category-form-section');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
-    const newCat: Category = {
-      id: `cat-${Date.now()}`,
-      name: newCatName.trim(),
-      slug: newCatName.toLowerCase().replace(/\s+/g, '-'),
-      iconName: newCatIcon,
-    };
-
-    const updated = [...categories, newCat];
-    saveCategories(updated);
-    saveCategoriesToCloud(updated);
+  const handleCancelEditCategory = () => {
+    setEditingCategoryId(null);
     setNewCatName('');
-    onRefreshData();
-    onShowToast(`Categoria "${newCat.name}" criada com sucesso!`);
+    setNewCatIcon('Package');
+  };
+
+  const handleSaveCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = newCatName.trim();
+    if (!trimmedName) return;
+
+    if (editingCategoryId) {
+      const existing = categories.find((c) => c.id === editingCategoryId);
+      if (!existing) return;
+
+      const nameAlreadyUsed = categories.some(
+        (c) => c.id !== editingCategoryId && c.name.toLowerCase() === trimmedName.toLowerCase()
+      );
+      if (nameAlreadyUsed) {
+        alert(`Já existe uma categoria cadastrada com o nome "${trimmedName}".`);
+        return;
+      }
+
+      const oldName = existing.name;
+      const updatedCategory: Category = {
+        ...existing,
+        name: trimmedName,
+        slug: trimmedName.toLowerCase().replace(/\s+/g, '-'),
+        iconName: newCatIcon,
+      };
+
+      const updatedCategories = categories.map((c) =>
+        c.id === editingCategoryId ? updatedCategory : c
+      );
+
+      // If category name changed, synchronize all catalog products that used the old name
+      if (oldName !== trimmedName) {
+        const affectedProducts = products.filter((p) => p.category === oldName);
+        for (const p of affectedProducts) {
+          const updatedProd = { ...p, category: trimmedName };
+          updateProduct(p.id, updatedProd);
+          updateProductInCloud(p.id, { category: trimmedName });
+        }
+      }
+
+      saveCategories(updatedCategories);
+      saveCategoriesToCloud(updatedCategories);
+      setEditingCategoryId(null);
+      setNewCatName('');
+      setNewCatIcon('Package');
+      onRefreshData();
+      onShowToast(`Categoria "${trimmedName}" atualizada com sucesso!`);
+    } else {
+      const nameAlreadyUsed = categories.some(
+        (c) => c.name.toLowerCase() === trimmedName.toLowerCase()
+      );
+      if (nameAlreadyUsed) {
+        alert(`Já existe uma categoria cadastrada com o nome "${trimmedName}".`);
+        return;
+      }
+
+      const newCat: Category = {
+        id: `cat-${Date.now()}`,
+        name: trimmedName,
+        slug: trimmedName.toLowerCase().replace(/\s+/g, '-'),
+        iconName: newCatIcon,
+      };
+
+      const updated = [...categories, newCat];
+      saveCategories(updated);
+      saveCategoriesToCloud(updated);
+      setNewCatName('');
+      setNewCatIcon('Package');
+      onRefreshData();
+      onShowToast(`Categoria "${newCat.name}" criada com sucesso!`);
+    }
   };
 
   const handleDeleteCategory = (catId: string, catName: string) => {
@@ -436,6 +663,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     if (window.confirm(`Excluir a categoria "${catName}"?`)) {
+      if (editingCategoryId === catId) {
+        handleCancelEditCategory();
+      }
       const updated = categories.filter((c) => c.id !== catId);
       saveCategories(updated);
       deleteCategoryFromCloud(catId);
@@ -484,14 +714,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const filteredProducts = products.filter((p) => {
-    const query = searchAdmin.toLowerCase();
-    return (
-      p.title.toLowerCase().includes(query) ||
-      p.category.toLowerCase().includes(query) ||
-      p.store.toLowerCase().includes(query)
-    );
-  });
+  const handleUpdatePosition = async (product: Product, newPositionRaw: number) => {
+    if (isNaN(newPositionRaw) || newPositionRaw < 1) {
+      onShowToast('❌ O número da posição deve ser 1 ou maior.');
+      return;
+    }
+
+    const currentPos = product.order || 1;
+    if (currentPos === newPositionRaw) return;
+
+    const result = reorderProductPosition(product.id, newPositionRaw);
+    if (!result.success) {
+      onShowToast(`❌ ${result.message}`);
+      return;
+    }
+
+    if (result.targetProduct) {
+      await swapProductOrdersInCloud(
+        { id: product.id, order: newPositionRaw },
+        result.swappedProduct ? { id: result.swappedProduct.id, order: result.swappedProduct.order || currentPos } : undefined
+      );
+    }
+
+    onRefreshData();
+    onShowToast(`✅ ${result.message}`);
+  };
+
+  const filteredProducts = [...products]
+    .filter((p) => {
+      const query = searchAdmin.toLowerCase();
+      return (
+        p.title.toLowerCase().includes(query) ||
+        p.category.toLowerCase().includes(query) ||
+        p.store.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => (a.order || 9999) - (b.order || 9999));
 
   // ==========================================
   // VIEW: LOGIN SCREEN (if not authenticated)
@@ -563,34 +821,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+              disabled={isLoggingIn}
+              className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
             >
               <Unlock className="w-4 h-4 text-amber-400" />
-              <span>Entrar no Painel Admin</span>
+              <span>{isLoggingIn ? 'Validando acesso...' : 'Entrar no Painel Admin'}</span>
             </button>
           </form>
 
-          {/* Helper Card with Default Credentials */}
-          <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 mb-5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-1.5">
-              <KeyRound className="w-4 h-4 text-amber-600" />
-              <span>Entrada Padrão Inicial:</span>
-            </div>
-            <div className="text-xs text-amber-800 space-y-1 mb-3 bg-white/70 p-2.5 rounded-lg border border-amber-200/60 font-mono text-[11px]">
-              <div><strong>Usuário:</strong> admin</div>
-              <div><strong>Senha padrão:</strong> admin123</div>
-            </div>
-            <p className="text-[11px] text-amber-700 leading-snug mb-3">
-              Após entrar, você poderá modificar a senha para qualquer outra de sua preferência na aba <strong>Segurança</strong>.
+          {/* Dica discreta de primeiro acesso */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-center">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Primeiro acesso de fábrica? Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
             </p>
-            <button
-              type="button"
-              onClick={handleQuickDefaultLogin}
-              className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Preencher Dados e Entrar com 1 Clique</span>
-            </button>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Caso já tenha alterado sua senha na aba Segurança, utilize a sua nova senha cadastrada.
+            </p>
           </div>
 
           <div className="text-center pt-2 border-t border-slate-100">
@@ -1162,6 +1408,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
+          {/* Dica de Organização Manual das Ofertas */}
+          <div className="px-4 py-2.5 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200/80 flex items-center gap-2 text-xs text-amber-950">
+            <Sliders className="w-4 h-4 text-orange-600 shrink-0" />
+            <span className="font-semibold text-orange-800">Organização Manual:</span>
+            <span className="text-slate-600 text-[11px] sm:text-xs">
+              Digite o número no campo <strong># Posição</strong> para definir a ordem no site (ex: <strong>1</strong> para 1ª oferta, <strong>4</strong> para 4ª). Ao trocar, nenhuma posição é repetida.
+            </span>
+          </div>
+
           {/* Content: Mobile Card View (md:hidden) + Desktop Table (hidden md:block) */}
           {filteredProducts.length === 0 ? (
             <div className="p-12 text-center">
@@ -1201,7 +1456,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <h4 className="font-bold text-xs text-slate-900 line-clamp-2 leading-snug">
                             {p.title}
                           </h4>
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
                             <span
                               style={{
                                 backgroundColor: storeConf.bg,
@@ -1213,18 +1468,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               <StoreLogo store={p.store} size="xs" />
                               <span>{p.store}</span>
                             </span>
-                            <span className="text-[11px] text-slate-500 font-medium">
+
+                            {/* Posição no Site (campo manual) */}
+                            <div className="inline-flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Posição da oferta no site">
+                              <span className="text-[10px] font-bold text-amber-950 uppercase">Posição:</span>
+                              <span className="text-xs font-black text-orange-600">#</span>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                key={`mob-${p.id}-${p.order}`}
+                                defaultValue={p.order}
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  if (!isNaN(val) && val !== p.order) {
+                                    handleUpdatePosition(p, val);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const val = parseInt((e.target as HTMLInputElement).value, 10);
+                                    if (!isNaN(val) && val !== p.order) {
+                                      handleUpdatePosition(p, val);
+                                    }
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                                className="w-12 px-1 py-0.5 text-center font-bold text-xs bg-white border border-amber-300 rounded text-slate-900 focus:outline-none focus:border-orange-500"
+                                title="Posição no site (sem repetição)"
+                              />
+                            </div>
+
+                            <span className="text-[11px] text-slate-400 font-medium">
                               {p.category}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Middle Info Row: Clicks & Featured Status */}
-                      <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-xl text-xs">
-                        <span className="font-bold text-slate-700 flex items-center gap-1 tabular-nums text-[11px]">
-                          🔥 {p.clicksCount || 0} cliques oficiais
-                        </span>
+                      {/* Middle Info Row: Real Clicks, Real Views & Featured Status */}
+                      <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-xl text-xs gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-extrabold text-orange-600 flex items-center gap-1 tabular-nums text-[11px]" title="Cliques reais no link oficial do parceiro">
+                            🔥 {p.realClicksCount || 0} cliques reais
+                          </span>
+                          <span className="text-slate-300">·</span>
+                          <span className="font-semibold text-slate-600 flex items-center gap-1 tabular-nums text-[11px]" title="Visualizações reais da página da oferta">
+                            👀 {p.realViewsCount || 0} views
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
@@ -1238,7 +1530,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               : 'bg-slate-200/80 text-slate-600'
                           }`}
                         >
-                          {p.isFeatured ? '★ Em Destaque' : 'Comum'}
+                          {p.isFeatured ? '★ Destaque' : 'Comum'}
                         </button>
                       </div>
 
@@ -1281,8 +1573,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <tr>
                       <th className="py-3 px-4">Produto</th>
                       <th className="py-3 px-4">Loja Parceira</th>
-                      <th className="py-3 px-4">Categoria</th>
-                      <th className="py-3 px-4 text-center">Cliques</th>
+                      <th className="py-3 px-4 text-center">Posição no Site</th>
+                      <th className="py-3 px-4 text-center" title="Cliques reais que visitantes deram no botão de compra">Cliques Reais</th>
+                      <th className="py-3 px-4 text-center" title="Visualizações reais da página da oferta">Views Reais</th>
+                      <th className="py-3 px-4 text-center" title="Números definidos manualmente para aparecer na loja aos clientes">Prova Social (Loja)</th>
                       <th className="py-3 px-4 text-center">Destaque</th>
                       <th className="py-3 px-4 text-right">Ações</th>
                     </tr>
@@ -1330,12 +1624,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </span>
                           </td>
 
-                          <td className="py-3 px-4 font-medium text-slate-700">
-                            {p.category}
+                          {/* Posição no Site (onde exibia categoria) */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex flex-col items-center">
+                              <div className="flex items-center gap-1 bg-amber-50/70 hover:bg-amber-100/70 px-2 py-1 rounded-xl border border-amber-200 transition-colors">
+                                <span className="text-xs font-black text-orange-600 pl-0.5">#</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  key={`tbl-${p.id}-${p.order}`}
+                                  defaultValue={p.order}
+                                  onBlur={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (!isNaN(val) && val !== p.order) {
+                                      handleUpdatePosition(p, val);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const val = parseInt((e.target as HTMLInputElement).value, 10);
+                                      if (!isNaN(val) && val !== p.order) {
+                                        handleUpdatePosition(p, val);
+                                      }
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                  className="w-14 px-1.5 py-1 text-center font-black text-sm bg-white border border-amber-300 rounded-lg text-slate-900 focus:outline-none focus:border-orange-500 shadow-2xs"
+                                  title="Digite a posição no site (ex: 1 para primeira oferta). Os números não se repetem!"
+                                />
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-medium mt-1 truncate max-w-[120px]" title={`Categoria: ${p.category}`}>
+                                {p.category}
+                              </span>
+                            </div>
                           </td>
 
-                          <td className="py-3 px-4 text-center font-bold tabular-nums text-slate-800">
-                            🔥 {p.clicksCount || 0}
+                          {/* Cliques Reais no Link */}
+                          <td className="py-3 px-4 text-center">
+                            <span className="font-extrabold tabular-nums text-orange-600 inline-flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-lg border border-orange-100" title="Cliques reais no link oficial do parceiro">
+                              🔥 {p.realClicksCount || 0}
+                            </span>
+                          </td>
+
+                          {/* Views Reais da Oferta */}
+                          <td className="py-3 px-4 text-center">
+                            <span className="font-semibold tabular-nums text-slate-700 inline-flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Aberturas reais da página desta oferta">
+                              👀 {p.realViewsCount || 0}
+                            </span>
+                          </td>
+
+                          {/* Prova Social Manual da Loja */}
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-flex flex-col items-center gap-0.5 text-[11px] text-slate-600">
+                              <span className="font-bold text-amber-600">★ {p.rating !== undefined ? p.rating : 4.9}</span>
+                              <span className="text-[10px] text-slate-400">({p.reviewCount !== undefined ? p.reviewCount : 384} aval. · {p.clicksCount || 1420} na loja)</span>
+                            </span>
                           </td>
 
                           <td className="py-3 px-4 text-center">
@@ -1472,6 +1816,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </select>
             </div>
 
+            {/* Posição no Site (Ordem Manual da Oferta) */}
+            <div className="md:col-span-2 bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80">
+              <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-amber-950">
+                  <Sliders className="w-4 h-4 text-orange-600" />
+                  Posição da Oferta no Site (Ordem de Exibição) *
+                </span>
+                <span className="text-[11px] font-bold text-orange-600 normal-case bg-orange-100/80 px-2 py-0.5 rounded-md">
+                  Sem números repetidos
+                </span>
+              </label>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="relative w-32">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-orange-600">#</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    value={formData.order}
+                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value, 10) || 1 })}
+                    className="w-full pl-8 pr-3 py-2 bg-white rounded-xl border border-amber-300 text-sm font-black text-slate-900 focus:outline-none focus:border-orange-500 shadow-2xs"
+                  />
+                </div>
+                <p className="text-xs text-slate-600 flex-1">
+                  Ex: Digite <strong>1</strong> para ser a primeira oferta exibida no site, <strong>4</strong> para quarta, etc. Se o número já estiver ocupado, as posições serão trocadas automaticamente para que nenhum número se repita!
+                </p>
+              </div>
+            </div>
+
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                 Link da Oferta no Parceiro (URL de Afiliado) *
@@ -1504,24 +1878,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                   Adicionar Outra Foto
                 </button>
-              </div>
-
-              <div className="mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                <span className="text-[11px] font-semibold text-slate-500 block mb-2">
-                  Fotos de estúdio pré-geradas prontas para uso:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {PRESET_IMAGES.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handlePickPresetImage(preset.url)}
-                      className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300 text-slate-700 rounded-lg text-[11px] font-medium border border-slate-200 transition-colors cursor-pointer"
-                    >
-                      + {preset.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -1628,6 +1984,95 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
+            {/* Prova Social: Avaliações e Acessos este Mês */}
+            <div className="md:col-span-2 bg-slate-50/90 rounded-2xl p-4 sm:p-5 border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
+                  <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                    <span>Prova Social do Produto (Exibida na Loja para o Público)</span>
+                    <span className="text-[10px] normal-case font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md">
+                      Inserção Manual
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Insira manualmente estes valores para exibir na página da oferta aos clientes. O painel administrativo contabiliza os cliques e acessos 100% reais de forma separada.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3 pt-3 border-t border-slate-200/60">
+                {/* 1. Nota da Avaliação (ex: 4.9) */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                    <span>Nota da Avaliação</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1.0"
+                      max="5.0"
+                      value={formData.rating}
+                      onChange={(e) => setFormData({ ...formData, rating: parseFloat(e.target.value) || 0 })}
+                      placeholder="4.9"
+                      className="w-full pl-3.5 pr-14 py-2.5 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-orange-500 shadow-xs"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-amber-600 pointer-events-none">
+                      ★ / 5.0
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Ex: <strong className="text-slate-600">4.9</strong>
+                  </span>
+                </div>
+
+                {/* 2. Quantidade de Avaliações no Parceiro (ex: 384) */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <span>Qtd. de Avaliações</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.reviewCount}
+                      onChange={(e) => setFormData({ ...formData, reviewCount: parseInt(e.target.value, 10) || 0 })}
+                      placeholder="384"
+                      className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 shadow-xs"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Exibe: <strong className="text-slate-600">({formData.reviewCount || 384} avaliações no parceiro)</strong>
+                  </span>
+                </div>
+
+                {/* 3. Quantidade de Acessos este Mês (ex: 1420) */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Flame className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Acessos este Mês</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.clicksCount}
+                      onChange={(e) => setFormData({ ...formData, clicksCount: parseInt(e.target.value, 10) || 0 })}
+                      placeholder="1420"
+                      className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 shadow-xs"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Exibe: <strong className="text-slate-600">{formData.clicksCount || 1420} acessos este mês</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <div className="md:col-span-2 flex items-center gap-3 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
               <input
                 type="checkbox"
@@ -1664,15 +2109,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* TAB 3: Categories Manager */}
       {activeTab === 'categories' && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-          <div className="md:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs h-fit">
-            <h3 className="text-base font-bold text-slate-900 mb-1">
-              Nova Categoria
-            </h3>
+          <div id="category-form-section" className="md:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs h-fit scroll-mt-20">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-bold text-slate-900">
+                {editingCategoryId ? 'Editar Categoria' : 'Nova Categoria'}
+              </h3>
+              {editingCategoryId && (
+                <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+                  Modo Edição
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 mb-4">
-              Crie novas categorias para agrupar ofertas no site.
+              {editingCategoryId 
+                ? 'Atualize o nome ou o ícone da categoria. Os produtos associados serão sincronizados.'
+                : 'Crie novas categorias para agrupar ofertas no site.'}
             </p>
 
-            <form onSubmit={handleCreateCategory} className="space-y-4">
+            {editingCategoryId && (
+              <div className="flex items-center justify-between p-2.5 mb-4 bg-orange-50/70 border border-orange-200 rounded-xl text-xs text-orange-950">
+                <span className="font-semibold truncate">
+                  Editando: <strong className="text-orange-600">{categories.find(c => c.id === editingCategoryId)?.name}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCancelEditCategory}
+                  className="text-orange-700 hover:text-orange-900 font-bold ml-2 underline shrink-0 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCategory} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Nome da Categoria
@@ -1682,7 +2151,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   required
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
-                  placeholder="Ex: Pets, Bebê & Kids, Livros..."
+                  placeholder="Ex: Informática, Ferramentas, Pets..."
                   className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
                 />
               </div>
@@ -1691,28 +2160,59 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Ícone Identificador
                 </label>
-                <select
-                  value={newCatIcon}
-                  onChange={(e) => setNewCatIcon(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
-                >
-                  <option value="Package">Package (Caixa padrão)</option>
-                  <option value="Boxes">Boxes (Organizadores)</option>
-                  <option value="Utensils">Utensils (Cozinha)</option>
-                  <option value="Smartphone">Smartphone (Gadgets/Tech)</option>
-                  <option value="Home">Home (Casa & Conforto)</option>
-                  <option value="Sparkles">Sparkles (Beleza & Banho)</option>
-                  <option value="Flame">Flame (Fogo / Destaques)</option>
-                </select>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-600 shrink-0 shadow-xs">
+                    {renderCategoryIcon(newCatIcon, 'w-5 h-5')}
+                  </div>
+                  <select
+                    value={newCatIcon}
+                    onChange={(e) => setNewCatIcon(e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-medium cursor-pointer"
+                  >
+                    {CATEGORY_ICON_GROUPS.map((grp) => (
+                      <optgroup key={grp.group} label={grp.group}>
+                        {grp.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  Escolha o ícone representativo (Eletrônicos, Informática, Ferramentas, Casa, Cozinha, etc.).
+                </span>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                Adicionar Categoria
-              </button>
+              <div className="pt-2">
+                {editingCategoryId ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-orange-500/20"
+                    >
+                      <Check className="w-4 h-4" />
+                      Salvar Alterações
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelEditCategory}
+                      className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Adicionar Categoria
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -1724,33 +2224,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               Categorias visíveis na navegação horizontal da página inicial.
             </p>
 
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {categories.map((c) => {
                 const count = products.filter((p) => p.category === c.name).length;
+                const isEditing = editingCategoryId === c.id;
                 return (
                   <div
                     key={c.id}
-                    className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80"
+                    className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                      isEditing
+                        ? 'bg-orange-50/70 border-orange-300 ring-2 ring-orange-400/20 shadow-xs'
+                        : 'bg-slate-50 border-slate-200/80 hover:border-slate-300'
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700">
-                        <Layers className="w-4 h-4" />
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
+                        isEditing
+                          ? 'bg-white border-orange-300 text-orange-600 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 shadow-xs'
+                      }`}>
+                        {renderCategoryIcon(c.iconName, 'w-4 h-4')}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-xs text-slate-900">{c.name}</h4>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-bold text-xs text-slate-900 truncate">{c.name}</h4>
+                          {isEditing && (
+                            <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-md">
+                              Em edição
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[11px] text-slate-500">
-                          {count} {count === 1 ? 'achadinho' : 'achadinhos'} associados
+                          {count} {count === 1 ? 'achadinho' : 'achadinhos'} associados &bull; <span className="font-mono text-[10px] text-slate-400">{c.iconName || 'Package'}</span>
                         </span>
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteCategory(c.id, c.name)}
-                      className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
-                      title="Excluir categoria (somente se não tiver produtos)"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleStartEditCategory(c)}
+                        className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                          isEditing
+                            ? 'bg-orange-200 text-orange-800'
+                            : 'text-slate-400 hover:text-slate-900 hover:bg-white'
+                        }`}
+                        title="Editar nome e ícone desta categoria"
+                        aria-label={`Editar categoria ${c.name}`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(c.id, c.name)}
+                        className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
+                        title="Excluir categoria (somente se não tiver produtos)"
+                        aria-label={`Excluir categoria ${c.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1765,13 +2296,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Total de Cliques nos Parceiros
+                Cliques Reais nos Parceiros
               </span>
               <div className="text-3xl font-extrabold text-orange-600 tabular-nums">
-                🔥 {totalClicks}
+                🔥 {totalRealClicks}
               </div>
               <p className="text-[11px] text-slate-500 mt-2">
-                Cliques registrados nos botões de redirecionamento para compras
+                Total de cliques 100% reais dados por visitantes em botões de compra ("Ir à Loja" / "Comprar")
+              </p>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Visualizações Reais das Ofertas
+              </span>
+              <div className="text-3xl font-extrabold text-slate-900 tabular-nums">
+                👀 {totalRealViews}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Acessos e visualizações reais das páginas completas dos achadinhos
               </p>
             </div>
 
@@ -1786,56 +2329,61 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 Achadinhos ativos no catálogo público
               </p>
             </div>
-
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Categorias Criadas
-              </span>
-              <div className="text-3xl font-extrabold text-slate-900 tabular-nums">
-                {categories.length}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-2">
-                Seções organizadas na barra de navegação
-              </p>
-            </div>
           </div>
 
           <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
-            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Flame className="w-5 h-5 text-orange-600" />
-              Achadinhos Mais Clicados pelos Visitantes
-            </h3>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Flame className="w-5 h-5 text-orange-600" />
+                Achadinhos Mais Clicados pelos Visitantes (Dados 100% Reais)
+              </h3>
+              <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg">
+                Atualizado em tempo real
+              </span>
+            </div>
 
             <div className="space-y-3">
-              {topProducts.map((p, idx) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                      {idx + 1}
-                    </span>
-                    <img
-                      src={p.images[0] || 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80'}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      className="w-10 h-10 rounded-xl object-cover shrink-0"
-                    />
-                    <div>
-                      <p className="font-bold text-xs text-slate-900 line-clamp-1">{p.title}</p>
-                      <span className="text-[11px] text-orange-600 font-semibold">{p.store} · {p.category}</span>
+              {topProducts.length === 0 || totalRealClicks === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <Flame className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="font-bold text-slate-700">Nenhum clique registrado ainda</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Conforme visitantes reais acessarem e clicarem em "Ir à Loja" nas ofertas, as estatísticas reais aparecerão aqui.
+                  </p>
+                </div>
+              ) : (
+                topProducts.map((p, idx) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        {idx + 1}
+                      </span>
+                      <img
+                        src={p.images[0] || 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80'}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded-xl object-cover shrink-0"
+                      />
+                      <div>
+                        <p className="font-bold text-xs text-slate-900 line-clamp-1">{p.title}</p>
+                        <span className="text-[11px] text-orange-600 font-semibold">{p.store} · {p.category}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-black text-orange-600 tabular-nums bg-orange-100/70 px-2.5 py-1 rounded-xl">
+                        🔥 {p.realClicksCount || 0} cliques
+                      </span>
+                      <span className="text-xs font-semibold text-slate-600 tabular-nums">
+                        👀 {p.realViewsCount || 0} views
+                      </span>
                     </div>
                   </div>
-
-                  <div className="text-right">
-                    <span className="text-sm font-extrabold text-slate-900 tabular-nums">
-                      {p.clicksCount || 0}
-                    </span>
-                    <span className="text-[11px] text-slate-500 block">cliques oficiais</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1937,10 +2485,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-orange-500/20 transition-colors cursor-pointer"
+              disabled={isChangingPassword}
+              className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-orange-500/20 transition-colors cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>Salvar Nova Senha</span>
+              <span>{isChangingPassword ? 'Salvando na nuvem...' : 'Salvar Nova Senha'}</span>
             </button>
           </form>
 

@@ -1,11 +1,13 @@
 import { 
   collection, 
   doc, 
+  getDoc,
   getDocs, 
   setDoc, 
   updateDoc, 
   deleteDoc, 
-  onSnapshot 
+  onSnapshot,
+  increment 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Product, Category, Banner, SiteConfig } from '../types';
@@ -23,7 +25,11 @@ import {
   getStoredProducts as getLocalProducts,
   getStoredCategories as getLocalCategories,
   getStoredBanners as getLocalBanners,
-  getStoredSiteConfig as getLocalSiteConfig
+  getStoredSiteConfig as getLocalSiteConfig,
+  getAdminPassword as getLocalAdminPassword,
+  setAdminPassword as saveLocalAdminPassword,
+  normalizeProductOrders,
+  DEFAULT_ADMIN_CONFIG
 } from './storage';
 
 // Collection references
@@ -32,6 +38,7 @@ const CATEGORIES_COL = 'categories';
 const BANNERS_COL = 'banners';
 const SETTINGS_COL = 'settings';
 const SITE_CONFIG_DOC = 'siteConfig';
+const ADMIN_AUTH_DOC = 'adminAuth';
 
 /**
  * Initializes Firestore with default seed data if collections are empty.
@@ -68,6 +75,19 @@ export async function initializeFirestoreSeed(): Promise<void> {
 
     const siteConfigRef = doc(db, SETTINGS_COL, SITE_CONFIG_DOC);
     await setDoc(siteConfigRef, getLocalSiteConfig() || INITIAL_SITE_CONFIG, { merge: true });
+
+    // Ensure admin auth is present in Firestore without overwriting an existing custom password
+    const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
+    const adminAuthSnap = await getDoc(adminAuthRef);
+    if (!adminAuthSnap.exists()) {
+      const currentPass = getLocalAdminPassword() || DEFAULT_ADMIN_CONFIG.defaultPassword;
+      await setDoc(adminAuthRef, { password: currentPass.trim(), updatedAt: Date.now() }, { merge: true });
+    } else {
+      const data = adminAuthSnap.data();
+      if (data && typeof data.password === 'string' && data.password.trim()) {
+        saveLocalAdminPassword(data.password.trim());
+      }
+    }
   } catch (error) {
     console.error('Error during Firestore initialization:', error);
   }
@@ -88,9 +108,10 @@ export function subscribeToProducts(
         if (!snapshot.empty) {
           const items: Product[] = [];
           snapshot.forEach((d) => items.push(d.data() as Product));
+          const normalized = normalizeProductOrders(items);
           // Keep local cache in sync
-          saveLocalProducts(items);
-          onUpdate(items);
+          saveLocalProducts(normalized);
+          onUpdate(normalized);
         } else {
           // If empty, initialize seed
           initializeFirestoreSeed().then(() => {
@@ -229,13 +250,27 @@ export async function updateProductInCloud(id: string, updates: Partial<Product>
   const index = current.findIndex((p) => p.id === id);
   if (index !== -1) {
     current[index] = { ...current[index], ...updates };
-    saveLocalProducts(current);
+    saveLocalProducts(normalizeProductOrders(current));
   }
 
   try {
     await updateDoc(doc(db, PRODUCTS_COL, id), updates);
   } catch (err) {
     console.error('Failed to update product in Firestore:', err);
+  }
+}
+
+export async function swapProductOrdersInCloud(
+  p1: { id: string; order: number },
+  p2?: { id: string; order: number }
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, PRODUCTS_COL, p1.id), { order: p1.order, updatedAt: new Date().toISOString() });
+    if (p2) {
+      await updateDoc(doc(db, PRODUCTS_COL, p2.id), { order: p2.order, updatedAt: new Date().toISOString() });
+    }
+  } catch (err) {
+    console.error('Failed to update product orders in Firestore:', err);
   }
 }
 
@@ -254,15 +289,33 @@ export async function trackCloudProductClick(id: string): Promise<void> {
   const current = getLocalProducts();
   const item = current.find((p) => p.id === id);
   if (item) {
-    const newCount = (item.clicksCount || 0) + 1;
-    item.clicksCount = newCount;
+    item.realClicksCount = (item.realClicksCount || 0) + 1;
     saveLocalProducts(current);
+  }
 
-    try {
-      await updateDoc(doc(db, PRODUCTS_COL, id), { clicksCount: newCount });
-    } catch {
-      // Non-blocking
-    }
+  try {
+    await updateDoc(doc(db, PRODUCTS_COL, id), { 
+      realClicksCount: increment(1) 
+    });
+  } catch (err) {
+    console.error('Failed to increment real product clicks in Firestore:', err);
+  }
+}
+
+export async function trackCloudProductView(id: string): Promise<void> {
+  const current = getLocalProducts();
+  const item = current.find((p) => p.id === id);
+  if (item) {
+    item.realViewsCount = (item.realViewsCount || 0) + 1;
+    saveLocalProducts(current);
+  }
+
+  try {
+    await updateDoc(doc(db, PRODUCTS_COL, id), { 
+      realViewsCount: increment(1) 
+    });
+  } catch (err) {
+    console.error('Failed to increment real product views in Firestore:', err);
   }
 }
 
@@ -313,5 +366,66 @@ export async function saveSiteConfigToCloud(config: SiteConfig): Promise<void> {
     await setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), config, { merge: true });
   } catch (err) {
     console.error('Failed to save site config to Firestore:', err);
+  }
+}
+
+/**
+ * Cloud Operations for Admin Password Security
+ */
+export async function fetchAdminPasswordFromCloud(): Promise<string> {
+  try {
+    const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
+    const snap = await getDoc(adminAuthRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && typeof data.password === 'string' && data.password.trim()) {
+        const cloudPass = data.password.trim();
+        saveLocalAdminPassword(cloudPass);
+        return cloudPass;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not fetch cloud admin password:', err);
+  }
+  return getLocalAdminPassword() || DEFAULT_ADMIN_CONFIG.defaultPassword;
+}
+
+export async function saveAdminPasswordToCloud(newPassword: string): Promise<boolean> {
+  const trimmed = newPassword.trim();
+  saveLocalAdminPassword(trimmed);
+  try {
+    const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
+    await setDoc(adminAuthRef, { password: trimmed, updatedAt: Date.now() }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('Failed to save admin password to Firestore:', err);
+    return false;
+  }
+}
+
+export function subscribeToAdminPassword(
+  onUpdate: (password: string) => void
+): () => void {
+  try {
+    const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
+    return onSnapshot(
+      adminAuthRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data && typeof data.password === 'string' && data.password.trim()) {
+            const cloudPass = data.password.trim();
+            saveLocalAdminPassword(cloudPass);
+            onUpdate(cloudPass);
+          }
+        }
+      },
+      (err) => {
+        console.warn('Firestore admin password listener error:', err);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to attach admin password listener:', err);
+    return () => {};
   }
 }

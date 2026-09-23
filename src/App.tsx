@@ -16,13 +16,17 @@ import {
   getStoredProducts, 
   getStoredCategories, 
   trackProductClick,
-  getStoredBanners
+  trackProductView,
+  getStoredBanners,
+  setAdminPassword
 } from './services/storage';
 import {
   subscribeToProducts,
   subscribeToCategories,
   subscribeToBanners,
+  subscribeToAdminPassword,
   trackCloudProductClick,
+  trackCloudProductView,
   initializeFirestoreSeed
 } from './services/firebaseService';
 import { Navbar } from './components/Navbar';
@@ -34,7 +38,6 @@ import { ProductDetail } from './components/ProductDetail';
 import { AdminPanel } from './components/AdminPanel';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
-import { WhatsAppButton } from './components/WhatsAppButton';
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -90,6 +93,10 @@ export default function App() {
       }
     });
 
+    const unsubAdminAuth = subscribeToAdminPassword((cloudPassword) => {
+      setAdminPassword(cloudPassword);
+    });
+
     // Check URL hash for direct deep linking (e.g. #produto/prod-1 or #admin)
     const handleHashChange = () => {
       const hash = window.location.hash;
@@ -111,6 +118,7 @@ export default function App() {
       unsubProducts();
       unsubCategories();
       unsubBanners();
+      unsubAdminAuth();
     };
   }, []);
 
@@ -123,6 +131,8 @@ export default function App() {
 
   // Navigation handlers
   const handleOpenProduct = (product: Product) => {
+    trackProductView(product.id);
+    trackCloudProductView(product.id);
     setSelectedProductId(product.id);
     setCurrentView('detail');
     window.location.hash = `#produto/${product.id}`;
@@ -200,8 +210,11 @@ export default function App() {
         break;
       case 'featured':
       default:
-        // Featured items first, then by clicks/popularity
+        // Organização Manual definida no Painel Admin (Posição #1, #2, #3, #4...)
         result.sort((a, b) => {
+          const orderA = typeof a.order === 'number' && a.order > 0 ? a.order : 9999;
+          const orderB = typeof b.order === 'number' && b.order > 0 ? b.order : 9999;
+          if (orderA !== orderB) return orderA - orderB;
           if (a.isFeatured && !b.isFeatured) return -1;
           if (!a.isFeatured && b.isFeatured) return 1;
           return (b.clicksCount || 0) - (a.clicksCount || 0);
@@ -260,6 +273,7 @@ export default function App() {
               onSelectStore={setSelectedStore}
               selectedBadge={selectedBadge}
               onSelectBadge={setSelectedBadge}
+              products={products}
             />
 
             {/* Search Bar & Buscar Button */}
@@ -364,9 +378,6 @@ export default function App() {
 
       {/* Global Notification Toast */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
-
-      {/* Floating WhatsApp Support Button with mobile-friendly spacing */}
-      <WhatsAppButton hasBottomBar={currentView === 'detail'} />
     </div>
   );
 }

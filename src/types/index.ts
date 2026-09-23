@@ -20,6 +20,9 @@ export interface Product {
   highlights: string[];
   badges: string[];
   isFeatured: boolean;
+  order?: number;
+  realClicksCount?: number;
+  realViewsCount?: number;
   clicksCount: number;
   rating?: number;
   reviewCount?: number;

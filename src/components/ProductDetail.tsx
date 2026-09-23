@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -86,6 +86,15 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 3);
 
+  // Preposição gramatical correta: "no Mercado Livre/Magalu/AliExpress" vs "na Shopee/Amazon/Shein"
+  const storePrep = useMemo(() => {
+    const s = (product.store || '').toLowerCase().trim();
+    if (s.includes('mercado livre') || s.includes('aliexpress') || s.includes('magalu')) {
+      return 'no';
+    }
+    return 'na';
+  }, [product.store]);
+
   const handleOpenPartnerLink = () => {
     trackProductClick(product.id);
     trackCloudProductClick(product.id);
@@ -93,19 +102,33 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
     onShowToast(`Redirecionando para a loja oficial parceira (${product.store})...`);
   };
 
+  const getProductShareUrl = () => {
+    const baseUrl = window.location.href.split('#')[0];
+    return `${baseUrl}#produto/${product.id}`;
+  };
+
+  const getShareMessage = () => {
+    const productUrl = getProductShareUrl();
+    return `Olha esse achadinho que encontrei no Achados do Dia: *${product.title}*!\n\nConfira aqui: ${productUrl}`;
+  };
+
   const handleCopyLink = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url);
+    const url = getProductShareUrl();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).catch(() => {});
+    }
     setCopiedLink(true);
     onShowToast('Link do achadinho copiado para a área de transferência!');
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const handleShareWhatsApp = () => {
-    const message = encodeURIComponent(
-      `Olha esse achadinho que encontrei no Achados do Dia: *${product.title}*!\n\nConfira aqui: ${window.location.href}`
-    );
-    window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
+  const handleShareWhatsApp = (e?: React.MouseEvent) => {
+    const shareMessage = getShareMessage();
+    // Copy the text and URL directly to clipboard so the user can paste anywhere immediately
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareMessage).catch(() => {});
+    }
+    onShowToast('Link do achadinho copiado! Abrindo WhatsApp...');
   };
 
   return (
@@ -212,14 +235,18 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               <span>Gostou? Compartilhe com amigos:</span>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(getShareMessage())}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={handleShareWhatsApp}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs no-underline"
               >
                 <MessageCircle className="w-3.5 h-3.5 fill-current" />
                 <span>WhatsApp</span>
-              </button>
+              </a>
               <button
+                type="button"
                 onClick={handleCopyLink}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
@@ -268,15 +295,15 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
             <div className="flex items-center gap-4 py-3 border-y border-slate-100 mb-6 text-xs text-slate-600">
               <div className="flex items-center gap-1 text-slate-900 font-bold">
                 <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                <span>{product.rating || '4.9'}</span>
+                <span>{product.rating !== undefined ? product.rating : '4.9'}</span>
                 <span className="text-slate-400 font-normal">
-                  ({product.reviewCount || '350'} avaliações no parceiro)
+                  ({product.reviewCount !== undefined ? product.reviewCount : 384} avaliações no parceiro)
                 </span>
               </div>
               <span className="text-slate-300">·</span>
               <div className="flex items-center gap-1 text-orange-600 font-medium">
                 <Flame className="w-3.5 h-3.5" />
-                <span>{product.clicksCount || 120} acessos este mês</span>
+                <span>{product.clicksCount !== undefined ? product.clicksCount : 1420} acessos este mês</span>
               </div>
             </div>
 
@@ -314,7 +341,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
             <div className="relative z-10">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <span className="text-xs font-semibold text-slate-300">
-                  Disponível para compra oficial em:
+                  Disponível para compra em:
                 </span>
                 <span
                   style={{
@@ -328,12 +355,9 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               </div>
 
               <div className="mb-4">
-                <h4 className="text-lg sm:text-xl font-bold tracking-tight text-white mb-1">
+                <h4 className="text-lg sm:text-xl font-bold tracking-tight text-white">
                   Garanta esta oferta na loja oficial
                 </h4>
-                <p className="text-xs text-slate-400">
-                  O valor final, disponibilidade de frete grátis e cupons ativos são consultados e garantidos diretamente no site do parceiro.
-                </p>
               </div>
 
               {/* Main Outbound Button */}
@@ -341,13 +365,16 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                 onClick={handleOpenPartnerLink}
                 className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 transition-all transform active:scale-98 cursor-pointer"
               >
-                <span>Conferir Oferta na {product.store}</span>
+                <span>Pegar Oferta {storePrep} {product.store}</span>
                 <ExternalLink className="w-5 h-5" />
               </button>
 
-              <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
-                <ShieldAlert className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Link oficial verificado · Compra 100% segura no ambiente da loja parceira</span>
+              <div className="mt-3 flex flex-col items-center justify-center text-center gap-1 text-[11px] text-slate-400">
+                <div className="flex items-center justify-center gap-1.5 font-medium text-emerald-400">
+                  <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                  <span>Link oficial verificado</span>
+                </div>
+                <span>Compra 100% segura no ambiente da loja parceira</span>
               </div>
             </div>
           </div>
@@ -421,7 +448,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
           onClick={handleOpenPartnerLink}
           className="shrink-0 py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
         >
-          <span>Ir à Loja</span>
+          <span>Pegar Oferta</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>

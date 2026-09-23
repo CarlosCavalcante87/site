@@ -73,18 +73,55 @@ export const STORE_CONFIG: Record<
   },
 };
 
+/**
+ * Ensures that every product has a unique, non-repeating position (order >= 1)
+ * and returns the list sorted by order ascending.
+ */
+export const normalizeProductOrders = (products: Product[]): Product[] => {
+  const used = new Set<number>();
+  let nextPos = 1;
+
+  const list = products.map((p) => ({ ...p }));
+
+  // First keep products that already have a valid, unique order > 0
+  for (const p of list) {
+    if (typeof p.order === 'number' && p.order > 0 && !used.has(p.order)) {
+      used.add(p.order);
+    } else {
+      p.order = undefined as any;
+    }
+  }
+
+  // Fill in any products that were undefined or duplicate
+  for (const p of list) {
+    if (typeof p.order !== 'number' || p.order <= 0) {
+      while (used.has(nextPos)) {
+        nextPos++;
+      }
+      p.order = nextPos;
+      used.add(nextPos);
+    }
+  }
+
+  // Sort ascending by order
+  return list.sort((a, b) => (a.order || 0) - (b.order || 0));
+};
+
 export const getStoredProducts = (): Product[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(INITIAL_PRODUCTS));
-      return INITIAL_PRODUCTS;
+      const normalized = normalizeProductOrders(INITIAL_PRODUCTS);
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(normalized));
+      return normalized;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_PRODUCTS;
+    const validArray = Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_PRODUCTS;
+    const normalized = normalizeProductOrders(validArray);
+    return normalized;
   } catch (error) {
     console.error('Failed to load products from localStorage', error);
-    return INITIAL_PRODUCTS;
+    return normalizeProductOrders(INITIAL_PRODUCTS);
   }
 };
 
@@ -165,22 +202,87 @@ export const saveStoredSiteConfig = (config: SiteConfig): void => {
   }
 };
 
+export interface ReorderResult {
+  success: boolean;
+  message: string;
+  targetProduct?: Product;
+  swappedProduct?: Product;
+}
+
+export const reorderProductPosition = (productId: string, newPosition: number): ReorderResult => {
+  const current = getStoredProducts();
+  const target = current.find((p) => p.id === productId);
+  if (!target) {
+    return { success: false, message: 'Produto não encontrado.' };
+  }
+
+  if (isNaN(newPosition) || newPosition < 1) {
+    return { success: false, message: 'A posição deve ser um número maior ou igual a 1.', targetProduct: target };
+  }
+
+  const oldPosition = target.order || 1;
+  if (oldPosition === newPosition) {
+    return { success: true, message: `O produto já está na posição #${newPosition}.`, targetProduct: target };
+  }
+
+  // Find if another product currently holds this position
+  const conflicting = current.find((p) => p.id !== productId && p.order === newPosition);
+
+  if (conflicting) {
+    // Swap positions so neither is repeated!
+    conflicting.order = oldPosition;
+    conflicting.updatedAt = new Date().toISOString();
+    target.order = newPosition;
+    target.updatedAt = new Date().toISOString();
+
+    const normalized = normalizeProductOrders(current);
+    saveProducts(normalized);
+
+    return {
+      success: true,
+      message: `Posição #${newPosition} definida! A posição foi trocada com "${conflicting.title}" (que agora é #${oldPosition}) para não haver repetição.`,
+      targetProduct: target,
+      swappedProduct: conflicting,
+    };
+  } else {
+    // No conflict, assign directly
+    target.order = newPosition;
+    target.updatedAt = new Date().toISOString();
+
+    const normalized = normalizeProductOrders(current);
+    saveProducts(normalized);
+
+    return {
+      success: true,
+      message: `Posição do produto alterada para #${newPosition} com sucesso!`,
+      targetProduct: target,
+    };
+  }
+};
+
 export const addProduct = (
-  newProductData: Omit<Product, 'id' | 'createdAt' | 'clicksCount'>
+  newProductData: Omit<Product, 'id' | 'createdAt'>
 ): Product => {
   const current = getStoredProducts();
   const id = `prod-${Date.now()}`;
+
+  let targetOrder = newProductData.order;
+  if (typeof targetOrder !== 'number' || targetOrder < 1) {
+    targetOrder = current.reduce((max, p) => Math.max(max, p.order || 0), 0) + 1;
+  }
+
   const newProduct: Product = {
     ...newProductData,
     id,
     createdAt: new Date().toISOString(),
-    clicksCount: 0,
-    rating: 4.8,
-    reviewCount: Math.floor(Math.random() * 200) + 40,
-    verifiedDeal: true,
+    order: targetOrder,
+    rating: newProductData.rating !== undefined ? newProductData.rating : 4.9,
+    reviewCount: newProductData.reviewCount !== undefined ? newProductData.reviewCount : 384,
+    clicksCount: newProductData.clicksCount !== undefined ? newProductData.clicksCount : 1420,
+    verifiedDeal: newProductData.verifiedDeal !== undefined ? newProductData.verifiedDeal : true,
   };
 
-  const updated = [newProduct, ...current];
+  const updated = normalizeProductOrders([newProduct, ...current]);
   saveProducts(updated);
   return newProduct;
 };
@@ -197,7 +299,8 @@ export const updateProduct = (id: string, updates: Partial<Product>): Product | 
   };
 
   current[index] = updatedProduct;
-  saveProducts(current);
+  const normalized = normalizeProductOrders(current);
+  saveProducts(normalized);
   return updatedProduct;
 };
 
@@ -213,7 +316,16 @@ export const trackProductClick = (id: string): void => {
   const current = getStoredProducts();
   const item = current.find((p) => p.id === id);
   if (item) {
-    item.clicksCount = (item.clicksCount || 0) + 1;
+    item.realClicksCount = (item.realClicksCount || 0) + 1;
+    saveProducts(current);
+  }
+};
+
+export const trackProductView = (id: string): void => {
+  const current = getStoredProducts();
+  const item = current.find((p) => p.id === id);
+  if (item) {
+    item.realViewsCount = (item.realViewsCount || 0) + 1;
     saveProducts(current);
   }
 };
@@ -254,7 +366,7 @@ export const DEFAULT_ADMIN_CONFIG = {
 export const getAdminPassword = (): string => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_PIN);
-    return saved ? saved : DEFAULT_ADMIN_CONFIG.defaultPassword;
+    return saved && saved.trim() ? saved.trim() : DEFAULT_ADMIN_CONFIG.defaultPassword;
   } catch {
     return DEFAULT_ADMIN_CONFIG.defaultPassword;
   }
@@ -262,7 +374,8 @@ export const getAdminPassword = (): string => {
 
 export const setAdminPassword = (newPassword: string): boolean => {
   try {
-    localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, newPassword);
+    const trimmed = newPassword.trim();
+    localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, trimmed);
     return true;
   } catch (error) {
     console.error('Failed to update admin password', error);
@@ -271,10 +384,12 @@ export const setAdminPassword = (newPassword: string): boolean => {
 };
 
 export const verifyAdminCredentials = (enteredUser: string, enteredPass: string): boolean => {
-  const currentPass = getAdminPassword();
-  const validUser = (enteredUser.trim().toLowerCase() === DEFAULT_ADMIN_CONFIG.username.toLowerCase()) || 
-                    (enteredUser.trim().toLowerCase() === 'admin@achadosdodia.com.br');
-  return validUser && enteredPass === currentPass;
+  const currentPass = getAdminPassword().trim();
+  const trimmedUser = enteredUser.trim().toLowerCase();
+  const trimmedPass = enteredPass.trim();
+  const validUser = (trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase()) || 
+                    (trimmedUser === 'admin@achadosdodia.com.br');
+  return validUser && trimmedPass === currentPass;
 };
 
 export const getAdminSession = (): boolean => {
