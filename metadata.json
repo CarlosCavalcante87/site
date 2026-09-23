@@ -1,0 +1,6 @@
+{
+  "name": "Achados do Dia",
+  "description": "Agregador de ofertas e achadinhos das melhores lojas online. Encontre os produtos mais virais e recomendados com links diretos para compra.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

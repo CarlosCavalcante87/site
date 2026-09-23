@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Products collection: public read, write allowed for app
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Categories collection: public read, write allowed for app
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Banners collection: public read, write allowed for app
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Site settings: public read, write allowed for app
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

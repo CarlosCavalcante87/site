@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "products": {
+      "title": "Products",
+      "description": "Affiliate and recommended products catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "store": { "type": "string" },
+        "affiliateUrl": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "badges": { "type": "array", "items": { "type": "string" } },
+        "highlights": { "type": "array", "items": { "type": "string" } },
+        "isFeatured": { "type": "boolean" },
+        "clicks": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "store", "affiliateUrl"]
+    },
+    "categories": {
+      "title": "Categories",
+      "description": "Product categories in the store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "iconName": { "type": "string" },
+        "displayOrder": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "banners": {
+      "title": "Banners",
+      "description": "Featured top promotional banners",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "badge": { "type": "string" },
+        "buttonText": { "type": "string" },
+        "linkUrl": { "type": "string" },
+        "tagCategory": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "order": { "type": "number" }
+      },
+      "required": ["id", "title", "imageUrl"]
+    },
+    "siteConfig": {
+      "title": "SiteConfig",
+      "description": "Global settings for site including WhatsApp support",
+      "type": "object",
+      "properties": {
+        "whatsappNumber": { "type": "string" },
+        "whatsappDefaultMessage": { "type": "string" },
+        "siteName": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "products",
+      "description": "Public catalog of products"
+    },
+    "/categories/{categoryId}": {
+      "schema": "categories",
+      "description": "Public catalog categories"
+    },
+    "/banners/{bannerId}": {
+      "schema": "banners",
+      "description": "Public banners"
+    },
+    "/settings/siteConfig": {
+      "schema": "siteConfig",
+      "description": "Public site configuration"
+    }
+  }
+}
