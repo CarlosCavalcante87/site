@@ -832,7 +832,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* Dica discreta de primeiro acesso */}
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-center">
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Primeiro acesso de fábrica? Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
+              Primeiro acesso de fábrica?
+              <br />
+              Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
             </p>
             <p className="text-[10px] text-slate-400 mt-1">
               Caso já tenha alterado sua senha na aba Segurança, utilize a sua nova senha cadastrada.

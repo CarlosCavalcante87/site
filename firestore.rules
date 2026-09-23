@@ -1,28 +1,42 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Products collection: public read, write allowed for app
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Products: public read, admin write, metrics public increment only
     match /products/{productId} {
       allow read: if true;
-      allow write: if true;
+      allow create, delete: if isAuthenticated();
+      allow update: if isAuthenticated() || 
+        (
+          resource != null && 
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['realClicksCount']) ||
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['realViewsCount'])
+          )
+        );
     }
 
-    // Categories collection: public read, write allowed for app
+    // Categories: public read, admin write
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // Banners collection: public read, write allowed for app
+    // Banners: public read, admin write
     match /banners/{bannerId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // Site settings: public read, write allowed for app
+    // Site settings: public read, admin write
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
   }
 }
+
