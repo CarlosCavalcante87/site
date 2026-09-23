@@ -59,8 +59,7 @@ import {
   Shirt,
   Dumbbell,
   Car,
-  Dog,
-  Loader2
+  Dog
 } from 'lucide-react';
 
 export const CATEGORY_ICON_GROUPS = [
@@ -175,7 +174,7 @@ import {
   saveAdminPasswordToCloud
 } from '../services/firebaseService';
 import { BannerGuideModal } from './BannerGuideModal';
-import { uploadImageFile } from '../services/imageUpload';
+import { uploadBannerImage } from '../services/bannerUpload';
 
 interface AdminPanelProps {
   products: Product[];
@@ -221,8 +220,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [banners, setBanners] = useState<Banner[]>(() => getStoredBanners());
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
-  const [isUploadingBannerImage, setIsUploadingBannerImage] = useState(false);
-  const [bannerImageError, setBannerImageError] = useState<string | null>(null);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => getStoredSiteConfig());
 
   // Password Change Form State
@@ -384,25 +381,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingBanner(null);
     onRefreshData();
     onShowToast(`Banner "${editingBanner.title}" atualizado com sucesso!`);
-  };
-
-  const handleBannerImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-selecting the same file later
-    if (!file || !editingBanner) return;
-
-    setBannerImageError(null);
-    setIsUploadingBannerImage(true);
-
-    const result = await uploadImageFile(file, 'banners');
-
-    setIsUploadingBannerImage(false);
-
-    if (result.success && result.url) {
-      setEditingBanner({ ...editingBanner, imageUrl: result.url });
-    } else {
-      setBannerImageError(result.error || 'Falha ao enviar a imagem.');
-    }
   };
 
   const handleToggleBanner = (id: string) => {
@@ -1205,7 +1183,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0 w-full md:w-auto pt-3 md:pt-0 border-t md:border-0 border-slate-200">
                     <button
-                      onClick={() => { setEditingBanner({ ...b }); setBannerImageError(null); }}
+                      onClick={() => setEditingBanner({ ...b })}
                       className="flex-1 md:flex-initial justify-center px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -1305,65 +1283,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
                       Imagem do Banner (Recomendado: 1200 x 360 px) *
                     </label>
-
-                    {editingBanner.imageUrl && (
-                      <div className="relative mb-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                        <img
-                          src={editingBanner.imageUrl}
-                          alt="Pré-visualização do banner"
-                          className="w-full h-28 object-cover"
+                    <div className="space-y-3">
+                      <label className="flex flex-col items-center justify-center w-full min-h-36 px-4 py-5 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-orange-50 hover:border-orange-300 transition-colors cursor-pointer">
+                        <ImageIcon className="w-8 h-8 text-orange-500 mb-2" />
+                        <span className="text-sm font-bold text-slate-700">Selecionar imagem</span>
+                        <span className="text-[11px] text-slate-500 mt-1 text-center">JPG, JPEG, PNG ou WEBP • até 5 MB</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file || !editingBanner) return;
+                            if (!file.type.startsWith('image/')) {
+                              onShowToast('Selecione uma imagem válida.');
+                              e.target.value = '';
+                              return;
+                            }
+                            if (file.size > 5 * 1024 * 1024) {
+                              onShowToast('A imagem deve ter no máximo 5 MB.');
+                              e.target.value = '';
+                              return;
+                            }
+                            try {
+                              onShowToast('Enviando imagem do banner...');
+                              const url = await uploadBannerImage(file, editingBanner.id);
+                              setEditingBanner((current) => current ? { ...current, imageUrl: url } : current);
+                              onShowToast('Imagem do banner enviada com sucesso!');
+                            } catch (error) {
+                              console.error('Banner upload error:', error);
+                              onShowToast('Não foi possível enviar a imagem. Verifique o Firebase Storage.');
+                            } finally {
+                              e.target.value = '';
+                            }
+                          }}
                         />
-                        {isUploadingBannerImage && (
-                          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 text-orange-600 animate-spin" />
+                      </label>
+
+                      {editingBanner.imageUrl && (
+                        <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-900">
+                          <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span className="text-[11px] font-semibold text-slate-700">Pré-visualização do banner</span>
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    <label
-                      htmlFor="banner-image-upload"
-                      className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
-                        isUploadingBannerImage
-                          ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
-                          : 'border-slate-300 bg-slate-50 text-slate-600 hover:border-orange-400 hover:text-orange-600'
-                      }`}
-                    >
-                      {isUploadingBannerImage ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Enviando imagem...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>{editingBanner.imageUrl ? 'Trocar imagem' : 'Escolher imagem do computador'}</span>
-                        </>
+                          <img
+                            src={editingBanner.imageUrl}
+                            alt="Pré-visualização do banner"
+                            className="w-full max-h-48 object-cover"
+                          />
+                        </div>
                       )}
-                      <input
-                        id="banner-image-upload"
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-                        onChange={handleBannerImageFileChange}
-                        disabled={isUploadingBannerImage}
-                        className="hidden"
-                      />
-                    </label>
-
-                    {bannerImageError && (
-                      <p className="mt-1 text-red-600 font-semibold">{bannerImageError}</p>
-                    )}
-
-                    {/* Hidden required field so native form validation still blocks submit without an image */}
-                    <input
-                      type="text"
-                      required
-                      value={editingBanner.imageUrl}
-                      onChange={() => {}}
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="sr-only"
-                    />
+                    </div>
                   </div>
 
                   <div>
