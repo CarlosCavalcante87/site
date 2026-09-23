@@ -59,7 +59,8 @@ import {
   Shirt,
   Dumbbell,
   Car,
-  Dog
+  Dog,
+  Loader2
 } from 'lucide-react';
 
 export const CATEGORY_ICON_GROUPS = [
@@ -174,6 +175,7 @@ import {
   saveAdminPasswordToCloud
 } from '../services/firebaseService';
 import { BannerGuideModal } from './BannerGuideModal';
+import { uploadImageFile } from '../services/imageUpload';
 
 interface AdminPanelProps {
   products: Product[];
@@ -219,6 +221,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [banners, setBanners] = useState<Banner[]>(() => getStoredBanners());
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isUploadingBannerImage, setIsUploadingBannerImage] = useState(false);
+  const [bannerImageError, setBannerImageError] = useState<string | null>(null);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => getStoredSiteConfig());
 
   // Password Change Form State
@@ -380,6 +384,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingBanner(null);
     onRefreshData();
     onShowToast(`Banner "${editingBanner.title}" atualizado com sucesso!`);
+  };
+
+  const handleBannerImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file || !editingBanner) return;
+
+    setBannerImageError(null);
+    setIsUploadingBannerImage(true);
+
+    const result = await uploadImageFile(file, 'banners');
+
+    setIsUploadingBannerImage(false);
+
+    if (result.success && result.url) {
+      setEditingBanner({ ...editingBanner, imageUrl: result.url });
+    } else {
+      setBannerImageError(result.error || 'Falha ao enviar a imagem.');
+    }
   };
 
   const handleToggleBanner = (id: string) => {
@@ -832,9 +855,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* Dica discreta de primeiro acesso */}
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-center">
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Primeiro acesso de fábrica?
-              <br />
-              Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
+              Primeiro acesso de fábrica? Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
             </p>
             <p className="text-[10px] text-slate-400 mt-1">
               Caso já tenha alterado sua senha na aba Segurança, utilize a sua nova senha cadastrada.
@@ -1184,7 +1205,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0 w-full md:w-auto pt-3 md:pt-0 border-t md:border-0 border-slate-200">
                     <button
-                      onClick={() => setEditingBanner({ ...b })}
+                      onClick={() => { setEditingBanner({ ...b }); setBannerImageError(null); }}
                       className="flex-1 md:flex-initial justify-center px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -1282,15 +1303,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   <div>
                     <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      URL da Imagem do Banner (Recomendado: 1200 x 360 px) *
+                      Imagem do Banner (Recomendado: 1200 x 360 px) *
                     </label>
+
+                    {editingBanner.imageUrl && (
+                      <div className="relative mb-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                        <img
+                          src={editingBanner.imageUrl}
+                          alt="Pré-visualização do banner"
+                          className="w-full h-28 object-cover"
+                        />
+                        {isUploadingBannerImage && (
+                          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 text-orange-600 animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <label
+                      htmlFor="banner-image-upload"
+                      className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                        isUploadingBannerImage
+                          ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+                          : 'border-slate-300 bg-slate-50 text-slate-600 hover:border-orange-400 hover:text-orange-600'
+                      }`}
+                    >
+                      {isUploadingBannerImage ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Enviando imagem...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>{editingBanner.imageUrl ? 'Trocar imagem' : 'Escolher imagem do computador'}</span>
+                        </>
+                      )}
+                      <input
+                        id="banner-image-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                        onChange={handleBannerImageFileChange}
+                        disabled={isUploadingBannerImage}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {bannerImageError && (
+                      <p className="mt-1 text-red-600 font-semibold">{bannerImageError}</p>
+                    )}
+
+                    {/* Hidden required field so native form validation still blocks submit without an image */}
                     <input
                       type="text"
                       required
                       value={editingBanner.imageUrl}
-                      onChange={(e) => setEditingBanner({ ...editingBanner, imageUrl: e.target.value })}
-                      placeholder="https://exemplo.com/banner.webp ou caminho da imagem"
-                      className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+                      onChange={() => {}}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="sr-only"
                     />
                   </div>
 
