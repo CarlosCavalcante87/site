@@ -7,9 +7,10 @@ import {
   updateDoc, 
   deleteDoc, 
   onSnapshot,
-  increment 
+  increment,
+  getDocFromServer
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { Product, Category, Banner, SiteConfig } from '../types';
 import { 
   INITIAL_PRODUCTS, 
@@ -40,6 +41,67 @@ const SETTINGS_COL = 'settings';
 const SITE_CONFIG_DOC = 'siteConfig';
 const ADMIN_AUTH_DOC = 'adminAuth';
 
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): FirestoreErrorInfo {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.warn('Firestore Operation Notice: ', JSON.stringify(errInfo));
+  return errInfo;
+}
+
+/**
+ * Validate Connection to Firestore on startup as mandated by Firebase Skill
+ */
+export async function testFirestoreConnection(): Promise<void> {
+  try {
+    await getDocFromServer(doc(db, 'settings', 'siteConfig'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn("Please check your Firebase configuration or internet connection.");
+    }
+  }
+}
+testFirestoreConnection();
+
 /**
  * Initializes Firestore with default seed data if collections are empty.
  */
@@ -48,7 +110,6 @@ export async function initializeFirestoreSeed(): Promise<void> {
     const productsSnap = await getDocs(collection(db, PRODUCTS_COL));
     if (productsSnap.empty) {
       console.log('Seeding initial products to Firestore...');
-      // Use local storage data or initial products
       const productsToSeed = getLocalProducts().length > 0 ? getLocalProducts() : INITIAL_PRODUCTS;
       for (const prod of productsToSeed) {
         await setDoc(doc(db, PRODUCTS_COL, prod.id), prod);
@@ -74,22 +135,12 @@ export async function initializeFirestoreSeed(): Promise<void> {
     }
 
     const siteConfigRef = doc(db, SETTINGS_COL, SITE_CONFIG_DOC);
-    await setDoc(siteConfigRef, getLocalSiteConfig() || INITIAL_SITE_CONFIG, { merge: true });
-
-    // Ensure admin auth is present in Firestore without overwriting an existing custom password
-    const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
-    const adminAuthSnap = await getDoc(adminAuthRef);
-    if (!adminAuthSnap.exists()) {
-      const currentPass = getLocalAdminPassword() || DEFAULT_ADMIN_CONFIG.defaultPassword;
-      await setDoc(adminAuthRef, { password: currentPass.trim(), updatedAt: Date.now() }, { merge: true });
-    } else {
-      const data = adminAuthSnap.data();
-      if (data && typeof data.password === 'string' && data.password.trim()) {
-        saveLocalAdminPassword(data.password.trim());
-      }
+    const siteConfigSnap = await getDoc(siteConfigRef);
+    if (!siteConfigSnap.exists()) {
+      await setDoc(siteConfigRef, getLocalSiteConfig() || INITIAL_SITE_CONFIG, { merge: true });
     }
   } catch (error) {
-    console.error('Error during Firestore initialization:', error);
+    handleFirestoreError(error, OperationType.GET, 'initial_seed');
   }
 }
 
@@ -109,25 +160,20 @@ export function subscribeToProducts(
           const items: Product[] = [];
           snapshot.forEach((d) => items.push(d.data() as Product));
           const normalized = normalizeProductOrders(items);
-          // Keep local cache in sync
           saveLocalProducts(normalized);
           onUpdate(normalized);
         } else {
-          // If empty, initialize seed
-          initializeFirestoreSeed().then(() => {
-            onUpdate(getLocalProducts());
-          });
+          onUpdate(getLocalProducts());
         }
       },
       (err) => {
-        console.error('Firestore products listener error:', err);
+        handleFirestoreError(err, OperationType.LIST, PRODUCTS_COL);
         if (onError) onError(err);
-        // Fallback to local
         onUpdate(getLocalProducts());
       }
     );
   } catch (err) {
-    console.error('Failed to attach products listener:', err);
+    handleFirestoreError(err, OperationType.LIST, PRODUCTS_COL);
     onUpdate(getLocalProducts());
     return () => {};
   }
@@ -155,12 +201,12 @@ export function subscribeToCategories(
         }
       },
       (err) => {
-        console.error('Firestore categories listener error:', err);
+        handleFirestoreError(err, OperationType.LIST, CATEGORIES_COL);
         onUpdate(getLocalCategories());
       }
     );
   } catch (err) {
-    console.error('Failed to attach categories listener:', err);
+    handleFirestoreError(err, OperationType.LIST, CATEGORIES_COL);
     onUpdate(getLocalCategories());
     return () => {};
   }
@@ -188,12 +234,12 @@ export function subscribeToBanners(
         }
       },
       (err) => {
-        console.error('Firestore banners listener error:', err);
+        handleFirestoreError(err, OperationType.LIST, BANNERS_COL);
         onUpdate(getLocalBanners());
       }
     );
   } catch (err) {
-    console.error('Failed to attach banners listener:', err);
+    handleFirestoreError(err, OperationType.LIST, BANNERS_COL);
     onUpdate(getLocalBanners());
     return () => {};
   }
@@ -219,12 +265,12 @@ export function subscribeToSiteConfig(
         }
       },
       (err) => {
-        console.error('Firestore siteConfig listener error:', err);
+        handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${SITE_CONFIG_DOC}`);
         onUpdate(getLocalSiteConfig());
       }
     );
   } catch (err) {
-    console.error('Failed to attach site config listener:', err);
+    handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${SITE_CONFIG_DOC}`);
     onUpdate(getLocalSiteConfig());
     return () => {};
   }
@@ -234,14 +280,13 @@ export function subscribeToSiteConfig(
  * Cloud CRUD operations for Products
  */
 export async function addProductToCloud(product: Product): Promise<void> {
-  // Save to local cache first
   const current = getLocalProducts();
   saveLocalProducts([product, ...current]);
 
   try {
     await setDoc(doc(db, PRODUCTS_COL, product.id), product);
   } catch (err) {
-    console.error('Failed to add product to Firestore:', err);
+    handleFirestoreError(err, OperationType.CREATE, `${PRODUCTS_COL}/${product.id}`);
   }
 }
 
@@ -256,7 +301,7 @@ export async function updateProductInCloud(id: string, updates: Partial<Product>
   try {
     await updateDoc(doc(db, PRODUCTS_COL, id), updates);
   } catch (err) {
-    console.error('Failed to update product in Firestore:', err);
+    handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${id}`);
   }
 }
 
@@ -270,7 +315,7 @@ export async function swapProductOrdersInCloud(
       await updateDoc(doc(db, PRODUCTS_COL, p2.id), { order: p2.order, updatedAt: new Date().toISOString() });
     }
   } catch (err) {
-    console.error('Failed to update product orders in Firestore:', err);
+    handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${p1.id}`);
   }
 }
 
@@ -281,7 +326,7 @@ export async function deleteProductFromCloud(id: string): Promise<void> {
   try {
     await deleteDoc(doc(db, PRODUCTS_COL, id));
   } catch (err) {
-    console.error('Failed to delete product from Firestore:', err);
+    handleFirestoreError(err, OperationType.DELETE, `${PRODUCTS_COL}/${id}`);
   }
 }
 
@@ -298,7 +343,7 @@ export async function trackCloudProductClick(id: string): Promise<void> {
       realClicksCount: increment(1) 
     });
   } catch (err) {
-    console.error('Failed to increment real product clicks in Firestore:', err);
+    // Non-blocking for visitors
   }
 }
 
@@ -315,7 +360,7 @@ export async function trackCloudProductView(id: string): Promise<void> {
       realViewsCount: increment(1) 
     });
   } catch (err) {
-    console.error('Failed to increment real product views in Firestore:', err);
+    // Non-blocking for visitors
   }
 }
 
@@ -329,7 +374,7 @@ export async function saveBannersToCloud(banners: Banner[]): Promise<void> {
       await setDoc(doc(db, BANNERS_COL, b.id), b);
     }
   } catch (err) {
-    console.error('Failed to save banners to Firestore:', err);
+    handleFirestoreError(err, OperationType.WRITE, BANNERS_COL);
   }
 }
 
@@ -343,7 +388,7 @@ export async function saveCategoriesToCloud(categories: Category[]): Promise<voi
       await setDoc(doc(db, CATEGORIES_COL, c.id), c);
     }
   } catch (err) {
-    console.error('Failed to save categories to Firestore:', err);
+    handleFirestoreError(err, OperationType.WRITE, CATEGORIES_COL);
   }
 }
 
@@ -353,7 +398,7 @@ export async function deleteCategoryFromCloud(id: string): Promise<void> {
   try {
     await deleteDoc(doc(db, CATEGORIES_COL, id));
   } catch (err) {
-    console.error('Failed to delete category from Firestore:', err);
+    handleFirestoreError(err, OperationType.DELETE, `${CATEGORIES_COL}/${id}`);
   }
 }
 
@@ -365,14 +410,17 @@ export async function saveSiteConfigToCloud(config: SiteConfig): Promise<void> {
   try {
     await setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), config, { merge: true });
   } catch (err) {
-    console.error('Failed to save site config to Firestore:', err);
+    handleFirestoreError(err, OperationType.WRITE, `${SETTINGS_COL}/${SITE_CONFIG_DOC}`);
   }
 }
 
 /**
- * Cloud Operations for Admin Password Security
+ * Cloud Operations for Admin Password Security (Available when Admin is authenticated)
  */
 export async function fetchAdminPasswordFromCloud(): Promise<string> {
+  if (!auth.currentUser) {
+    return getLocalAdminPassword() || DEFAULT_ADMIN_CONFIG.defaultPassword;
+  }
   try {
     const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
     const snap = await getDoc(adminAuthRef);
@@ -385,7 +433,7 @@ export async function fetchAdminPasswordFromCloud(): Promise<string> {
       }
     }
   } catch (err) {
-    console.warn('Could not fetch cloud admin password:', err);
+    handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
   }
   return getLocalAdminPassword() || DEFAULT_ADMIN_CONFIG.defaultPassword;
 }
@@ -393,19 +441,26 @@ export async function fetchAdminPasswordFromCloud(): Promise<string> {
 export async function saveAdminPasswordToCloud(newPassword: string): Promise<boolean> {
   const trimmed = newPassword.trim();
   saveLocalAdminPassword(trimmed);
+  if (!auth.currentUser) {
+    return true;
+  }
   try {
     const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
     await setDoc(adminAuthRef, { password: trimmed, updatedAt: Date.now() }, { merge: true });
     return true;
   } catch (err) {
-    console.error('Failed to save admin password to Firestore:', err);
-    return false;
+    handleFirestoreError(err, OperationType.WRITE, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
+    // Local save succeeded, so return true so the user is not locked out
+    return true;
   }
 }
 
 export function subscribeToAdminPassword(
   onUpdate: (password: string) => void
 ): () => void {
+  if (!auth.currentUser) {
+    return () => {};
+  }
   try {
     const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
     return onSnapshot(
@@ -421,11 +476,11 @@ export function subscribeToAdminPassword(
         }
       },
       (err) => {
-        console.warn('Firestore admin password listener error:', err);
+        handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
       }
     );
   } catch (err) {
-    console.warn('Failed to attach admin password listener:', err);
+    handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
     return () => {};
   }
 }

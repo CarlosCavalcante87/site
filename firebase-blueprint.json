@@ -59,6 +59,19 @@
         "whatsappDefaultMessage": { "type": "string" },
         "siteName": { "type": "string" }
       }
+    },
+    "admins": {
+      "title": "Admins",
+      "description": "Registered store administrators",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string" },
+        "lastLogin": { "type": "string" }
+      },
+      "required": ["uid", "email"]
     }
   },
   "firestore": {
@@ -77,6 +90,10 @@
     "/settings/siteConfig": {
       "schema": "siteConfig",
       "description": "Public site configuration"
+    },
+    "/admins/{adminId}": {
+      "schema": "admins",
+      "description": "Store administrators registry"
     }
   }
 }

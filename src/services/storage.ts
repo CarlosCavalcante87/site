@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   CATEGORIES: 'achados_do_dia_categories_v1',
   CLICKS: 'achados_do_dia_clicks_v1',
   ADMIN_PIN: 'achados_do_dia_admin_pin_v1',
+  ADMIN_PASSWORD: 'achados_do_dia_admin_password_v2',
   BANNERS: 'achados_do_dia_banners_v1',
   SITE_CONFIG: 'achados_do_dia_site_config_v1',
 };
@@ -375,7 +376,7 @@ export const DEFAULT_ADMIN_CONFIG = {
 
 export const getAdminPassword = (): string => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_PIN);
+    const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_PASSWORD) || localStorage.getItem(STORAGE_KEYS.ADMIN_PIN);
     return saved && saved.trim() ? saved.trim() : DEFAULT_ADMIN_CONFIG.defaultPassword;
   } catch {
     return DEFAULT_ADMIN_CONFIG.defaultPassword;
@@ -385,6 +386,7 @@ export const getAdminPassword = (): string => {
 export const setAdminPassword = (newPassword: string): boolean => {
   try {
     const trimmed = newPassword.trim();
+    localStorage.setItem(STORAGE_KEYS.ADMIN_PASSWORD, trimmed);
     localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, trimmed);
     return true;
   } catch (error) {
@@ -393,18 +395,41 @@ export const setAdminPassword = (newPassword: string): boolean => {
   }
 };
 
+export const resetAdminPasswordToDefault = (): void => {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_PASSWORD);
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_PIN);
+    localStorage.setItem(STORAGE_KEYS.ADMIN_PASSWORD, DEFAULT_ADMIN_CONFIG.defaultPassword);
+    localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, DEFAULT_ADMIN_CONFIG.defaultPassword);
+  } catch (err) {
+    console.error('Failed to reset admin password', err);
+  }
+};
+
 export const verifyAdminCredentials = (enteredUser: string, enteredPass: string): boolean => {
   const currentPass = getAdminPassword().trim();
   const trimmedUser = enteredUser.trim().toLowerCase();
   const trimmedPass = enteredPass.trim();
   const validUser = (trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase()) || 
-                    (trimmedUser === 'admin@achadosdodia.com.br');
-  return validUser && trimmedPass === currentPass;
+                    (trimmedUser === 'admin@achadosdodia.com.br') ||
+                    (trimmedUser === 'ursula879518@gmail.com') ||
+                    (trimmedUser === '87informatica@gmail.com');
+  // Only the current active password is accepted (once changed, the old password is fully deactivated)
+  return validUser && (trimmedPass === currentPass);
 };
 
 export const getAdminSession = (): boolean => {
   try {
-    return sessionStorage.getItem('achados_do_dia_admin_session') === 'active';
+    const raw = sessionStorage.getItem('achados_do_dia_admin_session');
+    if (!raw) return false;
+    const sessionTime = parseInt(sessionStorage.getItem('achados_do_dia_admin_session_time') || '0', 10);
+    const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+    if (sessionTime && Date.now() - sessionTime > TWELVE_HOURS) {
+      sessionStorage.removeItem('achados_do_dia_admin_session');
+      sessionStorage.removeItem('achados_do_dia_admin_session_time');
+      return false;
+    }
+    return raw === 'active';
   } catch {
     return false;
   }
@@ -414,8 +439,10 @@ export const setAdminSession = (active: boolean): void => {
   try {
     if (active) {
       sessionStorage.setItem('achados_do_dia_admin_session', 'active');
+      sessionStorage.setItem('achados_do_dia_admin_session_time', Date.now().toString());
     } else {
       sessionStorage.removeItem('achados_do_dia_admin_session');
+      sessionStorage.removeItem('achados_do_dia_admin_session_time');
     }
   } catch (error) {
     console.error('Failed to set admin session', error);

@@ -77,11 +77,11 @@ export const Footer: React.FC<FooterProps> = ({
               <span className="text-slate-300">•</span>
               <button
                 onClick={onOpenAdmin}
-                className="inline-flex items-center gap-1.5 text-slate-500 hover:text-orange-600 font-semibold transition-colors cursor-pointer"
-                title="Acessar painel administrativo"
+                className="inline-flex items-center justify-center p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                title="Acesso restrito"
+                aria-label="Acesso administrativo"
               >
-                <Lock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Acesso Admin</span>
+                <Lock className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

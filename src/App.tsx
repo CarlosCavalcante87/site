@@ -101,10 +101,6 @@ export default function App() {
       }
     });
 
-    const unsubAdminAuth = subscribeToAdminPassword((cloudPassword) => {
-      setAdminPassword(cloudPassword);
-    });
-
     const unsubSiteConfig = subscribeToSiteConfig((cloudConfig) => {
       if (cloudConfig) {
         setSiteConfig(cloudConfig);
@@ -132,7 +128,6 @@ export default function App() {
       unsubProducts();
       unsubCategories();
       unsubBanners();
-      unsubAdminAuth();
       unsubSiteConfig();
     };
   }, []);

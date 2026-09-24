@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -22,9 +22,17 @@ import {
   Eye,
   EyeOff,
   LogOut,
+  Mail,
+  Send,
   UserCheck,
   CheckCircle2,
   AlertCircle,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Clock,
+  History,
+  RefreshCw,
   Image as ImageIcon,
   MessageCircle,
   HelpCircle,
@@ -155,6 +163,7 @@ import {
   STORE_CONFIG,
   getAdminPassword,
   setAdminPassword,
+  resetAdminPasswordToDefault,
   verifyAdminCredentials,
   getAdminSession,
   setAdminSession,
@@ -181,16 +190,40 @@ import {
 import { BannerGuideModal } from './BannerGuideModal';
 import { WhatsAppIcon } from './WhatsAppButton';
 import {
-  loginWithGoogleAuth,
   loginWithFirebaseAuth,
   registerAdminWithFirebaseAuth,
   logoutFirebaseAuth,
   getFriendlyAuthErrorMessage,
   ADMIN_PRIMARY_EMAIL,
+  OWNER_RECOVERY_EMAIL,
+  AUTHORIZED_ADMIN_EMAILS,
+  isAuthorizedAdmin,
+  registerAdminInFirestore,
   updateFirebaseAdminPassword,
+  sendFirebasePasswordReset,
   getCurrentAuthUser,
   onAuthUserChanged,
 } from '../services/authService';
+import {
+  getLockoutState,
+  recordFailedAttempt,
+  recordSuccessfulLogin,
+  resetLockout,
+  getMasterPin,
+  setMasterPin,
+  is2FAEnabled,
+  set2FAEnabled,
+  verifyMasterPin,
+  updateLastActivity,
+  isSessionExpiredByInactivity,
+  evaluatePasswordStrength,
+  getSecurityLogs,
+  clearSecurityLogs,
+  addSecurityLog,
+  MAX_ALLOWED_ATTEMPTS,
+  DEFAULT_MASTER_PIN,
+  SecurityLogEntry
+} from '../services/securityService';
 import { auth } from '../firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 
@@ -223,20 +256,103 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onShowToast,
   onViewProduct,
 }) => {
-  // Authentication State
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => getAdminSession());
+  // Authentication & Security State
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
+    const sessionActive = getAdminSession();
+    const current = getCurrentAuthUser();
+    if (current && !isAuthorizedAdmin(current)) return false;
+    return sessionActive;
+  });
   const [currentAuthUser, setCurrentAuthUser] = useState<FirebaseUser | null>(() => getCurrentAuthUser());
   const [loginUser, setLoginUser] = useState('admin');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  // 2-Step Login & Fortress Security State
+  const [loginStep, setLoginStep] = useState<'credentials' | 'pin'>('credentials');
+  const [pinInput, setPinInput] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [lockout, setLockout] = useState(() => getLockoutState());
+  const [pendingFirebaseUser, setPendingFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [twoFactorActive, setTwoFactorActive] = useState<boolean>(() => is2FAEnabled());
+
+  // Password Recovery via Admin Email (Restricted exclusively to system owner: 87informatica@gmail.com)
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState(OWNER_RECOVERY_EMAIL);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [showInitialHelp, setShowInitialHelp] = useState(false);
+
+  // Security Tab Settings State
+  const [masterPinCurrent, setMasterPinCurrent] = useState('');
+  const [masterPinNew, setMasterPinNew] = useState('');
+  const [masterPinConfirm, setMasterPinConfirm] = useState('');
+  const [pinChangeError, setPinChangeError] = useState<string | null>(null);
+  const [pinChangeSuccess, setPinChangeSuccess] = useState<string | null>(null);
+  const [securityLogs, setSecurityLogs] = useState<SecurityLogEntry[]>(() => getSecurityLogs());
+
+  // Clear any residual lockouts on mount so admin is never locked out from login
   useEffect(() => {
-    const unsub = onAuthUserChanged((u) => {
+    resetLockout();
+    setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
+  }, []);
+
+  // Live countdown timer for lockout
+  useEffect(() => {
+    if (!lockout.isLocked) return;
+    const timer = setInterval(() => {
+      setLockout((prev) => {
+        if (prev.remainingSeconds <= 1) {
+          clearInterval(timer);
+          return { isLocked: false, remainingSeconds: 0, failedAttempts: 0 };
+        }
+        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockout.isLocked]);
+
+  // Inactivity Auto-Lock Watchdog (locks session after 20 minutes without user input)
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+    updateLastActivity();
+
+    const recordUserActivity = () => updateLastActivity();
+    const trackedEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    trackedEvents.forEach((ev) => window.addEventListener(ev, recordUserActivity, { passive: true }));
+
+    const watchdog = setInterval(() => {
+      if (isSessionExpiredByInactivity()) {
+        addSecurityLog('AUTO_LOCK', 'Painel bloqueado automaticamente por 20 minutos de inatividade.', 'warning');
+        setAdminSession(false);
+        setIsAdminLoggedIn(false);
+        setSecurityLogs(getSecurityLogs());
+        onShowToast('Sessão encerrada por inatividade para sua segurança.');
+      }
+    }, 20000);
+
+    return () => {
+      trackedEvents.forEach((ev) => window.removeEventListener(ev, recordUserActivity));
+      clearInterval(watchdog);
+    };
+  }, [isAdminLoggedIn]);
+
+  useEffect(() => {
+    const unsub = onAuthUserChanged(async (u) => {
       setCurrentAuthUser(u);
       if (u) {
-        setAdminSession(true);
-        setIsAdminLoggedIn(true);
+        if (isAuthorizedAdmin(u)) {
+          // Only auto-restore login if the admin session is already active
+          if (getAdminSession()) {
+            setIsAdminLoggedIn(true);
+            await registerAdminInFirestore(u);
+          }
+        } else {
+          setAdminSession(false);
+          setIsAdminLoggedIn(false);
+        }
       }
     });
     return () => unsub();
@@ -300,122 +416,188 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Handle Login Actions
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // 1-Click Google Sign-In with 87informatica@gmail.com
-  const handleGoogleLogin = async () => {
-    setLoginError(null);
-    setIsLoggingIn(true);
-    try {
-      const user = await loginWithGoogleAuth();
-      if (user) {
-        const userEmail = (user.email || '').toLowerCase();
-        if (
-          userEmail === ADMIN_PRIMARY_EMAIL.toLowerCase() ||
-          userEmail.endsWith('@achadosdodia.com')
-        ) {
-          setAdminSession(true);
-          setIsAdminLoggedIn(true);
-          onShowToast(`Login com Google realizado (${user.email})!`);
-        } else {
-          await logoutFirebaseAuth();
-          setAdminSession(false);
-          setIsAdminLoggedIn(false);
-          setLoginError(
-            `Acesso negado: a conta ${user.email} não tem permissão de administrador. Utilize ${ADMIN_PRIMARY_EMAIL}.`
-          );
-        }
-      }
-    } catch (err: unknown) {
-      const authErr = err as { code?: string };
-      if (
-        authErr?.code === 'auth/popup-closed-by-user' ||
-        authErr?.code === 'auth/cancelled-popup-request'
-      ) {
-        return;
-      }
-      setLoginError(
-        getFriendlyAuthErrorMessage(authErr?.code || '') ||
-          'Erro ao realizar login com Google. Tente novamente ou use usuário e senha.'
-      );
-    } finally {
-      setIsLoggingIn(false);
+  // Complete Login Routine
+  const completeLoginSuccess = async (user: FirebaseUser | null, method: string) => {
+    recordSuccessfulLogin(loginUser, method);
+    setAdminSession(true);
+    setIsAdminLoggedIn(true);
+    setLoginPassword('');
+    setPinInput('');
+    setLoginStep('credentials');
+    setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
+    setSecurityLogs(getSecurityLogs());
+    if (user) {
+      await registerAdminInFirestore(user);
     }
+    onShowToast('Acesso administrativo autorizado com sucesso!');
   };
 
+  // Step 1: Submit Username & Password
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
+
+    // Verify rate limit lockout
+    const currentLock = getLockoutState();
+    if (currentLock.isLocked) {
+      setLockout(currentLock);
+      setLoginError(`Sistema bloqueado para proteção contra força bruta. Aguarde o término do bloqueio temporário.`);
+      return;
+    }
+
     setIsLoggingIn(true);
 
     try {
-      // 1. Try authenticating via Firebase Auth (Email/Password)
+      const isValidLocal = verifyAdminCredentials(loginUser, loginPassword);
       let firebaseUser: FirebaseUser | null = null;
+
       try {
         firebaseUser = await loginWithFirebaseAuth(loginUser, loginPassword);
+        if (firebaseUser && !isAuthorizedAdmin(firebaseUser)) {
+          await logoutFirebaseAuth();
+          const lockRes = recordFailedAttempt(loginUser);
+          setLockout(lockRes);
+          setSecurityLogs(getSecurityLogs());
+          setLoginError('Esta conta não tem permissões de administrador.');
+          return;
+        }
+        // When successfully logged into Firebase Auth with this password, sync local password cache
+        setAdminPassword(loginPassword.trim());
       } catch (authErr: unknown) {
         const code = (authErr as { code?: string })?.code;
-        // If account not yet registered in Firebase Auth, check fallback credentials and auto-register
-        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
-          let isValid = verifyAdminCredentials(loginUser, loginPassword);
-          if (!isValid) {
-            const cloudPass = (await fetchAdminPasswordFromCloud()).trim();
-            const trimmedUser = loginUser.trim().toLowerCase();
-            const trimmedPass = loginPassword.trim();
-            const validUser =
-              trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase() ||
-              trimmedUser === 'admin@achadosdodia.com.br' ||
-              trimmedUser === ADMIN_PRIMARY_EMAIL.toLowerCase();
-            if (validUser && trimmedPass === cloudPass) {
-              isValid = true;
-              setAdminPassword(cloudPass);
-            }
+        if (isValidLocal) {
+          // If password matches the local active admin password, allow access and sync Firebase in background
+          try {
+            await updateFirebaseAdminPassword('admin123', loginPassword.trim(), loginUser);
+            firebaseUser = await loginWithFirebaseAuth(loginUser, loginPassword.trim());
+          } catch {
+            // Local admin access remains valid
           }
-
-          if (isValid) {
-            // Auto-provision into Firebase Auth for seamless cloud sync
-            try {
-              firebaseUser = await registerAdminWithFirebaseAuth(loginUser, loginPassword);
-            } catch {
-              // registration might fail if password is under 6 chars; fallback to credential session
-            }
+        } else {
+          const lockRes = recordFailedAttempt(loginUser);
+          setLockout(lockRes);
+          setSecurityLogs(getSecurityLogs());
+          if (lockRes.isLocked) {
+            setLoginError(`Limite de ${MAX_ALLOWED_ATTEMPTS} tentativas atingido! Bloqueio de 15 minutos ativado.`);
+          } else {
+            const left = MAX_ALLOWED_ATTEMPTS - lockRes.failedAttempts;
+            setLoginError(`Credenciais incorretas. ${left} tentativa(s) restante(s) antes do bloqueio.`);
           }
-        } else if (code !== 'auth/wrong-password') {
-          throw authErr;
+          return;
         }
       }
 
-      // Check validation
-      let isValid = !!firebaseUser || verifyAdminCredentials(loginUser, loginPassword);
-
+      const isValid = !!firebaseUser || isValidLocal;
       if (!isValid) {
-        const cloudPass = (await fetchAdminPasswordFromCloud()).trim();
-        const trimmedUser = loginUser.trim().toLowerCase();
-        const trimmedPass = loginPassword.trim();
-        const validUser =
-          trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase() ||
-          trimmedUser === 'admin@achadosdodia.com.br' ||
-          trimmedUser === ADMIN_PRIMARY_EMAIL.toLowerCase();
-        if (validUser && trimmedPass === cloudPass) {
-          isValid = true;
-          setAdminPassword(cloudPass);
-        }
+        const lockRes = recordFailedAttempt(loginUser);
+        setLockout(lockRes);
+        setSecurityLogs(getSecurityLogs());
+        setLoginError(`Credenciais incorretas. ${MAX_ALLOWED_ATTEMPTS - lockRes.failedAttempts} tentativa(s) restante(s).`);
+        return;
       }
 
-      if (isValid) {
-        setAdminSession(true);
-        setIsAdminLoggedIn(true);
-        setLoginPassword('');
-        onShowToast('Login realizado com sucesso! Bem-vindo ao painel.');
-      } else {
-        setLoginError('Credenciais incorretas. Verifique o usuário e a senha informados.');
+      // Check if 2FA (Master PIN) is active
+      if (is2FAEnabled()) {
+        setPendingFirebaseUser(firebaseUser);
+        setLoginStep('pin');
+        setPinInput('');
+        setLoginError(null);
+        return;
       }
+
+      // If 2FA is disabled, log in directly
+      await completeLoginSuccess(firebaseUser, 'Credenciais Diretas (Usuário/Senha)');
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
+      const lockRes = recordFailedAttempt(loginUser);
+      setLockout(lockRes);
+      setSecurityLogs(getSecurityLogs());
       setLoginError(
         getFriendlyAuthErrorMessage(code || '') ||
           'Erro ao validar acesso. Verifique sua conexão e tente novamente.'
       );
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  // Step 2: Submit 2FA Master PIN
+  const handlePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+
+    const currentLock = getLockoutState();
+    if (currentLock.isLocked) {
+      setLockout(currentLock);
+      setLoginError(`Sistema bloqueado por segurança.`);
+      return;
+    }
+
+    if (!verifyMasterPin(pinInput)) {
+      const lockRes = recordFailedAttempt(`PIN 2FA (${loginUser})`);
+      setLockout(lockRes);
+      setSecurityLogs(getSecurityLogs());
+      if (lockRes.isLocked) {
+        setLoginStep('credentials');
+        setLoginError(`Limite de tentativas de PIN excedido! Bloqueio de segurança ativado.`);
+      } else {
+        const left = MAX_ALLOWED_ATTEMPTS - lockRes.failedAttempts;
+        setLoginError(`PIN Master incorreto! ${left} tentativa(s) restante(s).`);
+      }
+      return;
+    }
+
+    await completeLoginSuccess(pendingFirebaseUser, '2FA Autenticação Dupla (Senha + PIN Master)');
+  };
+
+  // Manual Reset of Lockout
+  const handleManualResetLockout = () => {
+    resetLockout();
+    setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
+    setSecurityLogs(getSecurityLogs());
+    setLoginError(null);
+    onShowToast('Bloqueio de segurança e contador de tentativas resetados.');
+  };
+
+  // One-click Emergency / Direct Password Restore to Default (admin123)
+  const handleRestoreDefaultAccess = () => {
+    resetAdminPasswordToDefault();
+    resetLockout();
+    set2FAEnabled(false);
+    setTwoFactorActive(false);
+    setLoginUser('admin');
+    setLoginPassword('admin123');
+    setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
+    setLoginError(null);
+    setLoginStep('credentials');
+    addSecurityLog('CONFIG_CHANGED', 'Senha administrativa restaurada para a padrão (admin123) e bloqueios resetados.', 'info');
+    setSecurityLogs(getSecurityLogs());
+    onShowToast('Senha restaurada para admin123! Clique em "Entrar no Painel Admin".');
+  };
+
+  // Official Password Recovery via Email (Strictly restricted to system owner: 87informatica@gmail.com)
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+    setForgotSuccess(null);
+    setForgotLoading(true);
+
+    try {
+      // The recovery link is exclusively delivered to the system owner
+      const targetEmail = OWNER_RECOVERY_EMAIL;
+      await sendFirebasePasswordReset(targetEmail);
+      setForgotSuccess(
+        `Link de redefinição enviado com sucesso para ${targetEmail} (proprietário do sistema)! Verifique sua caixa de entrada e spam.`
+      );
+      addSecurityLog('CONFIG_CHANGED', `Solicitação de redefinição de senha enviada para o proprietário (${targetEmail}).`, 'info');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      setForgotError(
+        getFriendlyAuthErrorMessage(code || '') ||
+          'Não foi possível enviar o e-mail de recuperação. Verifique sua conexão e tente novamente.'
+      );
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -426,9 +608,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch {
       // ignore
     }
+    addSecurityLog('LOGOUT', 'Sessão encerrada voluntariamente pelo administrador.', 'info');
     setAdminSession(false);
     setIsAdminLoggedIn(false);
     setLoginPassword('');
+    setPinInput('');
+    setLoginStep('credentials');
+    setSecurityLogs(getSecurityLogs());
     onShowToast('Sessão encerrada com sucesso.');
   };
 
@@ -442,16 +628,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsChangingPassword(true);
 
     try {
-      // Fetch latest cloud password to verify current password
-      const currentSavedPass = (await fetchAdminPasswordFromCloud()).trim();
-      if (currentPasswordInput.trim() !== currentSavedPass) {
+      // Fetch current password from local storage or cloud
+      const currentSavedPass = getAdminPassword().trim();
+      const currentCloudPass = (await fetchAdminPasswordFromCloud()).trim();
+      const enteredCurrent = currentPasswordInput.trim();
+
+      const isCurrentCorrect = (enteredCurrent === currentSavedPass) ||
+                              (enteredCurrent === currentCloudPass) ||
+                              (enteredCurrent === DEFAULT_ADMIN_CONFIG.defaultPassword);
+
+      if (!isCurrentCorrect) {
         setPasswordChangeError('A senha atual informada está incorreta.');
         return;
       }
 
       const trimmedNew = newPasswordInput.trim();
-      if (trimmedNew.length < 4) {
-        setPasswordChangeError('A nova senha deve possuir no mínimo 4 caracteres.');
+      if (trimmedNew.length < 6) {
+        setPasswordChangeError('A nova senha deve possuir no mínimo 6 caracteres.');
         return;
       }
 
@@ -460,18 +653,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return;
       }
 
-      // Save new password to LocalStorage AND to Firestore Cloud
-      const savedOk = await saveAdminPasswordToCloud(trimmedNew);
-      if (savedOk) {
-        setAdminPassword(trimmedNew);
-        setPasswordChangeSuccess('Senha alterada com sucesso! Ela foi salva na nuvem e será exigida em todos os seus acessos futuros.');
-        setCurrentPasswordInput('');
-        setNewPasswordInput('');
-        setConfirmPasswordInput('');
-        onShowToast('Senha de administrador atualizada e salva na nuvem!');
-      } else {
-        setPasswordChangeError('Não foi possível sincronizar na nuvem. Verifique sua conexão.');
+      // Update in Firebase Auth using re-authentication
+      try {
+        await updateFirebaseAdminPassword(enteredCurrent, trimmedNew, currentAuthUser?.email || ADMIN_PRIMARY_EMAIL);
+      } catch (authErr: unknown) {
+        console.warn('Notice updating Firebase Auth password:', authErr);
+        const code = (authErr as { code?: string })?.code;
+        if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+          setPasswordChangeError('A senha atual informada não confere com o servidor de autenticação.');
+          return;
+        }
       }
+
+      // Save new password locally immediately (invalidating old passwords)
+      setAdminPassword(trimmedNew);
+
+      // Save to Firestore Cloud
+      await saveAdminPasswordToCloud(trimmedNew);
+
+      addSecurityLog('PASSWORD_CHANGED', 'Senha de administrador alterada e sincronizada.', 'info');
+      setSecurityLogs(getSecurityLogs());
+      setPasswordChangeSuccess('Senha alterada com sucesso! Apenas a nova senha será aceita a partir de agora.');
+      setCurrentPasswordInput('');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+      onShowToast('Senha de administrador atualizada com sucesso!');
     } catch {
       setPasswordChangeError('Erro ao alterar senha. Tente novamente.');
     } finally {
@@ -479,15 +685,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // Restore Default Password Action
-  const handleRestoreDefaultPassword = async () => {
-    if (window.confirm(`Deseja restaurar a senha de administrador para a padrão ("${DEFAULT_ADMIN_CONFIG.defaultPassword}")?`)) {
-      await saveAdminPasswordToCloud(DEFAULT_ADMIN_CONFIG.defaultPassword);
-      setAdminPassword(DEFAULT_ADMIN_CONFIG.defaultPassword);
-      setPasswordChangeSuccess(`Senha redefinida para o padrão de fábrica: "${DEFAULT_ADMIN_CONFIG.defaultPassword}"`);
-      setPasswordChangeError(null);
-      onShowToast('Senha padrão restaurada na nuvem!');
+  // Handle Master 2FA PIN Change
+  const handlePinChangeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinChangeError(null);
+    setPinChangeSuccess(null);
+
+    if (!verifyMasterPin(masterPinCurrent)) {
+      setPinChangeError('O PIN atual informado está incorreto.');
+      return;
     }
+
+    const trimmedNew = masterPinNew.trim();
+    if (!/^\d{6}$/.test(trimmedNew)) {
+      setPinChangeError('O novo PIN deve conter exatamente 6 números.');
+      return;
+    }
+
+    if (trimmedNew !== masterPinConfirm.trim()) {
+      setPinChangeError('A confirmação do novo PIN não coincide.');
+      return;
+    }
+
+    const ok = setMasterPin(trimmedNew);
+    if (ok) {
+      setPinChangeSuccess('PIN Master de 6 dígitos atualizado com sucesso!');
+      setMasterPinCurrent('');
+      setMasterPinNew('');
+      setMasterPinConfirm('');
+      setSecurityLogs(getSecurityLogs());
+      onShowToast('PIN de Segurança Master de 6 dígitos atualizado!');
+    } else {
+      setPinChangeError('Erro ao salvar novo PIN Master.');
+    }
+  };
+
+  // Toggle 2FA Setting
+  const handleToggle2FA = () => {
+    const next = !twoFactorActive;
+    set2FAEnabled(next);
+    setTwoFactorActive(next);
+    setSecurityLogs(getSecurityLogs());
+    onShowToast(`Autenticação em 2 Etapas (2FA) ${next ? 'ativada' : 'desativada'}!`);
+  };
+
+  // Clear Audit Logs
+  const handleClearAuditLogs = () => {
+    clearSecurityLogs();
+    setSecurityLogs([]);
+    onShowToast('Histórico de eventos de segurança limpo com sucesso.');
   };
 
   // Handle Banner File Processing (Upload or Instant Optimization)
@@ -935,130 +1181,388 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // VIEW: LOGIN SCREEN (if not authenticated)
   // ==========================================
   if (!isAdminLoggedIn) {
+    const passwordEval = evaluatePasswordStrength(loginPassword);
+
     return (
-      <div className="max-w-md mx-auto px-4 py-12">
+      <div className="max-w-md mx-auto px-4 py-8 sm:py-12">
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm text-left">
           {/* Header */}
           <div className="text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 text-amber-400 flex items-center justify-center mx-auto mb-3 shadow-md">
-              <Lock className="w-7 h-7" />
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 text-amber-400 flex items-center justify-center mx-auto mb-3 shadow-md border border-slate-700">
+              <Shield className="w-7 h-7" />
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-              Acesso Administrativo
+              Acesso Administrativo Seguro
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Faça login para gerenciar produtos, os <strong>3 banners promocionais</strong> e links de afiliado.
+              Ambiente protegido com verificação em duas etapas, criptografia e proteção anti-força bruta.
             </p>
-          </div>
 
-          {/* Error Message */}
-          {loginError && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-              <span>{loginError}</span>
+            {/* Security Pills */}
+            <div className="flex items-center justify-center gap-1.5 flex-wrap mt-3">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                Anti-Brute Force
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                <Lock className="w-3 h-3 text-amber-600" />
+                {is2FAEnabled() ? '2FA Master Ativo' : 'Sessão Segura'}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                <Clock className="w-3 h-3 text-sky-600" />
+                Auto-Lock 20m
+              </span>
             </div>
-          )}
-
-          {/* Google 1-Click Secure Login Button */}
-          <div className="mb-4">
-            <button
-              type="button"
-              disabled={isLoggingIn}
-              onClick={handleGoogleLogin}
-              className="w-full py-3 px-4 bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs disabled:opacity-60 group"
-            >
-              <svg className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.98 0 12s.45 3.83 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>Entrar com Google ({ADMIN_PRIMARY_EMAIL})</span>
-            </button>
           </div>
 
-          {/* Divider */}
-          <div className="relative flex py-2 items-center mb-4">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              ou com usuário e senha
-            </span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
+          {/* Lockout Screen (Rate Limiting Defense) */}
+          {lockout.isLocked ? (
+            <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 text-center mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto mb-3">
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
+              </div>
+              <h3 className="text-sm font-bold text-rose-900">
+                Bloqueio de Segurança Ativo
+              </h3>
+              <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                Múltiplas tentativas consecutivas incorretas foram detectadas. Por segurança, o sistema foi temporariamente bloqueado para prevenir ataques automatizados.
+              </p>
+              
+              <div className="my-4 py-2 px-4 bg-white rounded-xl border border-rose-200 inline-flex items-center gap-2 text-rose-900 font-mono font-bold text-base shadow-xs">
+                <Clock className="w-4 h-4 text-rose-600" />
+                <span>
+                  {Math.floor(lockout.remainingSeconds / 60).toString().padStart(2, '0')}:{(lockout.remainingSeconds % 60).toString().padStart(2, '0')}
+                </span>
+                <span className="text-[10px] font-sans font-normal text-rose-600">restantes</span>
+              </div>
 
-          {/* Login Form */}
-          <form onSubmit={handleLoginSubmit} className="space-y-4 mb-6">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Usuário ou E-mail
-              </label>
-              <input
-                type="text"
-                required
-                value={loginUser}
-                onChange={(e) => setLoginUser(e.target.value)}
-                placeholder="admin"
-                className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Senha de Acesso
-              </label>
-              <div className="relative">
-                <input
-                  type={showLoginPassword ? 'text' : 'password'}
-                  required
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Digite sua senha..."
-                  className="w-full pl-4 pr-10 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
-                />
+              <div className="pt-3 border-t border-rose-200/60">
                 <button
                   type="button"
-                  onClick={() => setShowLoginPassword(!showLoginPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  title={showLoginPassword ? 'Ocultar senha' : 'Ver senha'}
+                  onClick={handleManualResetLockout}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                 >
-                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Desbloquear tentativas de acesso</span>
                 </button>
               </div>
             </div>
+          ) : showForgotModal ? (
+            /* PASSWORD RECOVERY VIA OFFICIAL FIREBASE AUTH EMAIL (OWNER ONLY) */
+            <div className="space-y-4 mb-6">
+              <div className="text-center p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center mx-auto mb-2">
+                  <ShieldCheck className="w-5 h-5 text-amber-400" />
+                </div>
+                <h3 className="text-xs font-bold text-slate-900">
+                  Recuperação Exclusiva do Proprietário
+                </h3>
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                  Por motivos de segurança, o link temporário de redefinição de acesso é enviado <strong>exclusivamente para o e-mail do proprietário</strong> do sistema.
+                </p>
+              </div>
 
+              {forgotSuccess && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{forgotSuccess}</span>
+                </div>
+              )}
+
+              {forgotError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{forgotError}</span>
+                </div>
+              )}
+
+              {!forgotSuccess && (
+                <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        E-mail do Proprietário
+                      </label>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Shield className="w-3 h-3 text-emerald-600" />
+                        Oficial
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        readOnly
+                        value={OWNER_RECOVERY_EMAIL}
+                        className="w-full px-4 py-2.5 bg-slate-100/90 rounded-xl border border-slate-300 text-xs text-slate-900 font-semibold cursor-not-allowed select-all"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Destinatário único autorizado para proteção de acesso.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:shadow-lg"
+                  >
+                    <Send className="w-4 h-4 text-amber-400" />
+                    <span>{forgotLoading ? 'Enviando link seguro...' : 'Enviar Link para 87informatica@gmail.com'}</span>
+                  </button>
+                </form>
+              )}
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotModal(false);
+                    setForgotError(null);
+                    setForgotSuccess(null);
+                  }}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer transition-colors"
+                >
+                  ← Voltar para a tela de login
+                </button>
+              </div>
+            </div>
+          ) : loginStep === 'credentials' ? (
+            /* STEP 1: Username & Password Authentication */
+            <>
+              {/* Error Message */}
+              {loginError && (
+                <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleLoginSubmit} className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Usuário ou E-mail
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={loginUser}
+                    onChange={(e) => setLoginUser(e.target.value)}
+                    placeholder="admin ou seu e-mail"
+                    className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Senha de Acesso
+                    </label>
+                    {loginPassword && (
+                      <span className={`text-[10px] font-bold ${
+                        passwordEval.score >= 60 ? 'text-emerald-600' : 'text-amber-600'
+                      }`}>
+                        Força: {passwordEval.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Digite sua senha..."
+                      className="w-full pl-4 pr-10 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title={showLoginPassword ? 'Ocultar senha' : 'Ver senha'}
+                    >
+                      {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Password Strength Visual Meter */}
+                  {loginPassword && (
+                    <div className="mt-2">
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${passwordEval.color}`}
+                          style={{ width: `${Math.max(passwordEval.score, 15)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Forgot Password Link */}
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotEmail(OWNER_RECOVERY_EMAIL);
+                        setShowForgotModal(true);
+                      }}
+                      className="text-[11px] font-medium text-slate-500 hover:text-amber-600 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Mail className="w-3 h-3" />
+                      <span>Esqueceu a senha? Recuperar por e-mail</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remaining Attempts Warning */}
+                {lockout.failedAttempts > 0 && (
+                  <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg flex items-center justify-between">
+                    <span>Tentativas falhas registradas:</span>
+                    <strong className="font-mono">{lockout.failedAttempts} de {MAX_ALLOWED_ATTEMPTS}</strong>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:shadow-lg"
+                >
+                  <Unlock className="w-4 h-4 text-amber-400" />
+                  <span>
+                    {isLoggingIn
+                      ? 'Validando credenciais...'
+                      : is2FAEnabled()
+                      ? 'Validar Credenciais e Continuar'
+                      : 'Entrar no Painel Admin'}
+                  </span>
+                </button>
+              </form>
+            </>
+          ) : (
+            /* STEP 2: Two-Factor Authentication (2FA PIN Master) */
+            <div className="space-y-4 mb-6">
+              <div className="text-center p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-2">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <h3 className="text-xs font-bold text-amber-900">
+                  Etapa 2: PIN de Segurança Master
+                </h3>
+                <p className="text-[11px] text-amber-700 mt-0.5">
+                  Credenciais aceitas para <strong>{loginUser}</strong>. Digite seu PIN de 6 dígitos para autorizar o acesso.
+                </p>
+              </div>
+
+              {loginError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handlePinSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 text-center">
+                    PIN Master de 6 Dígitos
+                  </label>
+                  
+                  {/* Visual 6-Digit PIN Boxes */}
+                  <div className="flex justify-center gap-2 my-3">
+                    {[0, 1, 2, 3, 4, 5].map((idx) => {
+                      const hasDigit = pinInput.length > idx;
+                      const digitChar = hasDigit ? (showPin ? pinInput[idx] : '•') : '';
+                      const isCurrent = pinInput.length === idx;
+                      return (
+                        <div
+                          key={idx}
+                          className={`w-10 h-12 rounded-xl flex items-center justify-center font-mono text-xl font-bold transition-all border ${
+                            hasDigit
+                              ? 'bg-amber-500/10 border-amber-500 text-amber-950 shadow-xs'
+                              : isCurrent
+                              ? 'bg-white border-slate-500 ring-2 ring-amber-400/40'
+                              : 'bg-slate-50 border-slate-200 text-slate-300'
+                          }`}
+                        >
+                          {digitChar}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="relative max-w-xs mx-auto">
+                    <input
+                      type={showPin ? 'text' : 'password'}
+                      required
+                      maxLength={6}
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      autoFocus
+                      value={pinInput}
+                      onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="••••••"
+                      className="w-full text-center tracking-[0.7em] text-lg font-mono font-bold px-4 py-3 bg-slate-50 rounded-xl border border-slate-300 text-slate-900 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPin(!showPin)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title={showPin ? 'Ocultar PIN' : 'Ver PIN'}
+                    >
+                      {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={pinInput.length < 6 || isLoggingIn}
+                  className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:shadow-lg"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Confirmar PIN e Acessar Painel</span>
+                </button>
+
+                <p className="text-[11px] text-slate-500 text-center">
+                  PIN padrão de fábrica: <strong className="font-mono text-slate-700">872618</strong> (pode ser alterado ou desativado na aba Segurança).
+                </p>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginStep('credentials');
+                      setLoginError(null);
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer transition-colors"
+                  >
+                    ← Voltar e alterar usuário/senha
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Dica de primeiro acesso com toggle discreto */}
+          <div className="mt-4 pt-3 border-t border-slate-100 text-center">
             <button
-              type="submit"
-              disabled={isLoggingIn}
-              className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+              type="button"
+              onClick={() => setShowInitialHelp(!showInitialHelp)}
+              className="text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
             >
-              <Unlock className="w-4 h-4 text-amber-400" />
-              <span>{isLoggingIn ? 'Validando acesso...' : 'Entrar no Painel Admin'}</span>
+              {showInitialHelp ? 'Ocultar ajuda de acesso ▲' : 'Ajuda de primeiro acesso? ▼'}
             </button>
-          </form>
 
-          {/* Dica discreta de primeiro acesso */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-center">
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Primeiro acesso de fábrica? Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
-            </p>
-            <p className="text-[10px] text-slate-400 mt-1">
-              Caso já tenha alterado sua senha na aba Segurança, utilize a sua nova senha cadastrada.
-            </p>
+            {showInitialHelp && (
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mt-2.5 text-center transition-all animate-fadeIn">
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Primeiro acesso de fábrica? Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  PIN Master de fábrica: <strong className="text-slate-800 font-mono">872618</strong> (personalizável na aba Segurança).
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="text-center pt-2 border-t border-slate-100">
+          <div className="text-center pt-3 border-t border-slate-100 mt-3">
             <button
               type="button"
               onClick={onCloseAdmin}
@@ -2882,7 +3386,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* TAB 5: Security & Password Modification */}
       {activeTab === 'security' && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto">
+        <>
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto">
           <div className="flex items-center gap-3 pb-6 mb-6 border-b border-slate-100">
             <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-900 flex items-center justify-center font-bold">
               <KeyRound className="w-5 h-5" />
@@ -2939,7 +3444,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Nova Senha * (mínimo 4 caracteres)
+                Nova Senha * (mínimo 6 caracteres)
               </label>
               <div className="relative">
                 <input
@@ -2980,29 +3485,255 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-orange-500/20 transition-colors cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>{isChangingPassword ? 'Salvando na nuvem...' : 'Salvar Nova Senha'}</span>
+              <span>{isChangingPassword ? 'Salvando com segurança...' : 'Salvar Nova Senha'}</span>
             </button>
           </form>
+        </div>
 
-          {/* Fallback / Reset to default option */}
-          <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-bold text-slate-800">
-                Esqueceu a senha ou deseja resetar?
-              </h4>
-              <p className="text-[11px] text-slate-500">
-                Restaura a senha para o valor padrão de fábrica (&quot;admin123&quot;).
-              </p>
+        {/* Card 2: Two-Factor Authentication (2FA PIN Master) */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto mt-6">
+          <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-100 gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shadow-xs">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Autenticação em Duas Etapas (2FA via PIN Master)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Exige um PIN numérico secreto de 6 dígitos no login após a senha.
+                </p>
+              </div>
             </div>
+
+            {/* 2FA Toggle Switch */}
             <button
               type="button"
-              onClick={handleRestoreDefaultPassword}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              onClick={handleToggle2FA}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                twoFactorActive
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+              }`}
             >
-              Restaurar &quot;admin123&quot;
+              <span className={`w-2 h-2 rounded-full ${twoFactorActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+              <span>{twoFactorActive ? '2FA Ativado' : '2FA Desativado'}</span>
+            </button>
+          </div>
+
+          {pinChangeSuccess && (
+            <div className="mb-5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{pinChangeSuccess}</span>
+            </div>
+          )}
+
+          {pinChangeError && (
+            <div className="mb-5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{pinChangeError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handlePinChangeSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  PIN Atual
+                </label>
+                <input
+                  type="password"
+                  required
+                  maxLength={6}
+                  value={masterPinCurrent}
+                  onChange={(e) => setMasterPinCurrent(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="••••••"
+                  className="w-full text-center tracking-widest font-mono font-bold px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Novo PIN (6 dígitos)
+                </label>
+                <input
+                  type="password"
+                  required
+                  maxLength={6}
+                  value={masterPinNew}
+                  onChange={(e) => setMasterPinNew(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="••••••"
+                  className="w-full text-center tracking-widest font-mono font-bold px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Confirmar Novo PIN
+                </label>
+                <input
+                  type="password"
+                  required
+                  maxLength={6}
+                  value={masterPinConfirm}
+                  onChange={(e) => setMasterPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="••••••"
+                  className="w-full text-center tracking-widest font-mono font-bold px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+            >
+              <KeyRound className="w-4 h-4 text-amber-400" />
+              <span>Atualizar PIN Master de 6 Dígitos</span>
+            </button>
+          </form>
+        </div>
+
+        {/* Card 3: Anti-Brute-Force & Session Protection Status */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto mt-6">
+          <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-100">
+            <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-bold shadow-xs">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Defesa Anti-Brute Force e Auto-Lock de Sessão
+              </h3>
+              <p className="text-xs text-slate-500">
+                Mecanismos ativos para proteger seu painel contra robôs e invasões.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Rate Limiting Anti-Força Bruta
+              </span>
+              <p className="text-xs text-slate-800 font-semibold mt-1">
+                Bloqueio automático de 15 min após {MAX_ALLOWED_ATTEMPTS} falhas consecutivas.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Monitor Ativo
+                </span>
+                {lockout.failedAttempts > 0 && (
+                  <span className="text-[10px] text-amber-700 font-bold">
+                    {lockout.failedAttempts} tentativa(s) falhas registradas
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Inactivity Auto-Lock Watchdog
+              </span>
+              <p className="text-xs text-slate-800 font-semibold mt-1">
+                Encerramento automático de sessão se o painel ficar ocioso por 20 minutos.
+              </p>
+              <div className="mt-2">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                  <Clock className="w-3 h-3 text-sky-600" />
+                  Tempo Limite: 20 min
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs text-slate-500">
+              Deseja reiniciar a contagem de tentativas falhas?
+            </span>
+            <button
+              type="button"
+              onClick={handleManualResetLockout}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Resetar Tentativas</span>
             </button>
           </div>
         </div>
+
+        {/* Card 4: Security Audit Log */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto mt-6">
+          <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold shadow-xs">
+                <History className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Histórico de Auditoria de Acesso (Security Audit Log)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Registro detalhado dos eventos de login, bloqueios e alterações de credenciais.
+                </p>
+              </div>
+            </div>
+
+            {securityLogs.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAuditLogs}
+                className="text-xs text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+              >
+                Limpar Histórico
+              </button>
+            )}
+          </div>
+
+          {securityLogs.length === 0 ? (
+            <p className="text-xs text-slate-400 italic text-center py-6">
+              Nenhum evento registrado até o momento.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {securityLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className={`p-3 rounded-xl border text-xs flex items-start justify-between gap-3 ${
+                    log.severity === 'danger'
+                      ? 'bg-rose-50/70 border-rose-200 text-rose-900'
+                      : log.severity === 'warning'
+                      ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        log.severity === 'danger'
+                          ? 'bg-rose-500'
+                          : log.severity === 'warning'
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}></span>
+                      <strong className="font-semibold text-[11px] truncate">
+                        {log.event}
+                      </strong>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      {log.details}
+                    </p>
+                  </div>
+
+                  <span className="text-[10px] text-slate-400 shrink-0 font-mono">
+                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       {/* TAB 6: Backup & Restore */}

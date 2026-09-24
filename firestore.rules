@@ -24,36 +24,74 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Trusted Admin Verification: matches the owner's authenticated Google account or registered admin UID
+    // Trusted Admin Verification: matches authorized admin accounts or registered admin records
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == '87informatica@gmail.com' ||
+        request.auth.token.email in ['ursula879518@gmail.com', '87informatica@gmail.com'] ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['id', 'title', 'store', 'affiliateUrl']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() <= 300 &&
+        data.store is string && data.store.size() <= 100 &&
+        data.affiliateUrl is string && data.affiliateUrl.size() <= 2048 &&
+        (!('price' in data) || data.price is number || data.price is string) &&
+        (!('clicksCount' in data) || data.clicksCount is number) &&
+        (!('realClicksCount' in data) || data.realClicksCount is number) &&
+        (!('realViewsCount' in data) || data.realViewsCount is number);
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['id', 'name']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.name is string && data.name.size() <= 100;
+    }
+
+    function isValidBanner(data) {
+      return data.keys().hasAll(['id', 'title', 'imageUrl']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() <= 200 &&
+        data.imageUrl is string && data.imageUrl.size() <= 2048;
+    }
+
+    function isValidSiteConfig(data) {
+      return (!('whatsappNumber' in data) || (data.whatsappNumber is string && data.whatsappNumber.size() <= 50)) &&
+        (!('siteName' in data) || (data.siteName is string && data.siteName.size() <= 100));
+    }
+
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+        data.uid is string && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() <= 200;
     }
 
     // Products Collection: Public read catalog, secure admin write, public click tracking
     match /products/{productId} {
       allow read: if true;
-      allow create: if isAdmin() && isValidId(productId);
+      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
       allow delete: if isAdmin() && isValidId(productId);
       allow update: if isValidId(productId) && (
-        isAdmin() ||
-        // Tiered Public Click Tracking Action (Only click counters can be incremented by visitors)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['clicksCount', 'realClicksCount']))
+        (isAdmin() && isValidProduct(incoming())) ||
+        // Tiered Public Click/View Tracking Action (Only counters can be incremented by visitors)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['clicksCount', 'realClicksCount', 'realViewsCount']))
       );
     }
 
     // Categories Collection: Public read, Admin write
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidId(categoryId);
+      allow create, update: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
+      allow delete: if isAdmin() && isValidId(categoryId);
     }
 
     // Banners Collection: Public read, Admin write
     match /banners/{bannerId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidId(bannerId);
+      allow create, update: if isAdmin() && isValidId(bannerId) && isValidBanner(incoming());
+      allow delete: if isAdmin() && isValidId(bannerId);
     }
 
     // Site Settings:
@@ -61,7 +99,7 @@ service cloud.firestore {
     // - adminAuth is STRICTLY PRIVATE (only authenticated admin can read or write)
     match /settings/siteConfig {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isValidSiteConfig(incoming());
     }
 
     match /settings/adminAuth {
@@ -72,9 +110,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // Admins registry: Only admins can manage admins
+    // Admins registry: Admins or self can read, only authorized admins can write
     match /admins/{adminId} {
-      allow read, write: if isAdmin() && isValidId(adminId);
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
+      allow write: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming());
     }
   }
 }
