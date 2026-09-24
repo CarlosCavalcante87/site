@@ -71,6 +71,8 @@ Fácil de montar, desmontar e lavar em água corrente com sabão neutro. Economi
       'Fácil montagem sem ferramentas e higienização simplificada'
     ],
     badges: ['Destaque', 'Viral no TikTok', 'Frete Grátis'],
+    originalPrice: 129.90,
+    price: 89.90,
     isFeatured: true,
     order: 1,
     clicksCount: 1420,
@@ -103,6 +105,8 @@ Possui bateria interna de lítio com recarga rápida via USB Type-C que dura mai
       'Tamanho compacto que cabe em qualquer gaveta de talheres'
     ],
     badges: ['Mais Vendido', 'Cupom Ativo', 'Frete Grátis'],
+    originalPrice: 79.90,
+    price: 39.90,
     isFeatured: true,
     order: 2,
     clicksCount: 2310,
@@ -135,6 +139,8 @@ Conta com sensor de segurança com desligamento automático quando a água ating
       'Alimentação prática via cabo USB com baixo consumo energético'
     ],
     badges: ['Tendência', 'Destaque', 'Garantia Loja'],
+    originalPrice: 189.90,
+    price: 119.90,
     isFeatured: true,
     order: 3,
     clicksCount: 1890,
@@ -167,6 +173,8 @@ Controle por sensor tátil intuitivo que alterna entre 3 temperaturas de cor (Br
       'Timer automático de desligamento para a hora de dormir'
     ],
     badges: ['Novidade', 'Mais Vendido'],
+    originalPrice: 159.90,
+    price: 97.90,
     isFeatured: true,
     order: 4,
     clicksCount: 970,
@@ -199,6 +207,8 @@ Com bateria interna recarregável com autonomia de até 90 dias com uso familiar
       'Reservatório translúcido de 350ml para fácil monitoramento de nível'
     ],
     badges: ['Frete Grátis', 'Viral no TikTok'],
+    originalPrice: 119.90,
+    price: 69.90,
     isFeatured: false,
     order: 5,
     clicksCount: 1140,
@@ -231,6 +241,8 @@ O vidro transparente cristalino facilita a identificação imediata do conteúdo
       'Ideal para grãos, café, massas, cereais e especiarias'
     ],
     badges: ['Destaque', 'Mais Vendido'],
+    originalPrice: 149.90,
+    price: 99.90,
     isFeatured: true,
     order: 6,
     clicksCount: 1640,
@@ -263,6 +275,8 @@ Possui ímã na base para ficar sempre fixado na porta da geladeira, pronto para
       'Bateria interna recarregável com trava de proteção infantil'
     ],
     badges: ['Viral no TikTok', 'Cupom Ativo'],
+    originalPrice: 49.90,
+    price: 27.90,
     isFeatured: false,
     order: 7,
     clicksCount: 890,
@@ -295,6 +309,8 @@ Diferente dos tapetes felpudos tradicionais que acumulam ácaros e demoram horas
       'Fácil higienização rápida com água corrente ou pano úmido'
     ],
     badges: ['Frete Grátis', 'Tendência'],
+    originalPrice: 69.90,
+    price: 39.90,
     isFeatured: false,
     order: 8,
     clicksCount: 780,

@@ -41,6 +41,7 @@ import { ProductDetail } from './components/ProductDetail';
 import { AdminPanel } from './components/AdminPanel';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
+import { updatePageSEO } from './utils/seo';
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -176,7 +177,7 @@ export default function App() {
     trackCloudProductClick(product.id);
     refreshData();
     window.open(product.affiliateUrl, '_blank', 'noopener,noreferrer');
-    showToast(`Redirecionando para a loja oficial ${product.store}...`);
+    showToast(`Redirecionando para ${product.store}...`);
   };
 
   // Filtered & Sorted Products
@@ -258,6 +259,32 @@ export default function App() {
     if (!selectedProductId) return null;
     return products.find((p) => p.id === selectedProductId) || null;
   }, [products, selectedProductId]);
+
+  // Synchronize SEO & OpenGraph / WhatsApp preview with first banner and active view
+  useEffect(() => {
+    if (currentView === 'detail' && currentProduct) {
+      updatePageSEO({
+        title: `${currentProduct.title} | Achados do Dia`,
+        description: currentProduct.description 
+          ? currentProduct.description.slice(0, 160)
+          : `Confira a oferta oficial de ${currentProduct.title} na ${currentProduct.store}. Link oficial verificado!`,
+        image: currentProduct.images?.[0] || '/og-image.jpg',
+        url: typeof window !== 'undefined' ? `${window.location.origin}/#produto/${currentProduct.id}` : ''
+      });
+    } else {
+      // Home / Catalog view: Use the 1st active banner image for WhatsApp preview
+      const activeBanners = banners.filter((b) => b.isActive);
+      const firstBanner = activeBanners[0] || banners[0];
+      const bannerImage = firstBanner?.imageUrl || '/og-image.jpg';
+
+      updatePageSEO({
+        title: 'Achados do Dia - Melhores Ofertas e Achadinhos da Internet',
+        description: 'Agregador de ofertas e achadinhos das melhores lojas online. Encontre os produtos mais virais e recomendados com links diretos para compra.',
+        image: bannerImage,
+        url: typeof window !== 'undefined' ? window.location.origin : ''
+      });
+    }
+  }, [currentView, currentProduct, banners]);
 
   const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedStore || selectedBadge || onlyFeatured);
 

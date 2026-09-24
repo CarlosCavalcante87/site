@@ -117,7 +117,14 @@ export const getStoredProducts = (): Product[] => {
     }
     const parsed = JSON.parse(raw);
     const validArray = Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_PRODUCTS;
-    const normalized = normalizeProductOrders(validArray);
+    const withPrices = validArray.map((p: Product) => {
+      const initMatch = INITIAL_PRODUCTS.find((ip) => ip.id === p.id);
+      if (initMatch && p.price === undefined && initMatch.price !== undefined) {
+        return { ...p, price: initMatch.price, originalPrice: initMatch.originalPrice };
+      }
+      return p;
+    });
+    const normalized = normalizeProductOrders(withPrices);
     return normalized;
   } catch (error) {
     console.error('Failed to load products from localStorage', error);

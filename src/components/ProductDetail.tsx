@@ -18,6 +18,7 @@ import { STORE_CONFIG, trackProductClick } from '../services/storage';
 import { trackCloudProductClick } from '../services/firebaseService';
 import { StoreLogo } from './StoreLogo';
 import { WhatsAppIcon } from './WhatsAppButton';
+import { PriceHistoryChart } from './PriceHistoryChart';
 
 interface ProductDetailProps {
   product: Product;
@@ -86,26 +87,11 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 3);
 
-  // Preposição gramatical correta: "no Mercado Livre/Magalu/AliExpress/Kabum" vs "na Shopee/Amazon/Shein"
-  const storePrep = useMemo(() => {
-    const s = (product.store || '').toLowerCase().trim();
-    if (
-      s.includes('mercado livre') || 
-      s.includes('aliexpress') || 
-      s.includes('magalu') || 
-      s.includes('magazine') ||
-      s.includes('kabum')
-    ) {
-      return 'no';
-    }
-    return 'na';
-  }, [product.store]);
-
   const handleOpenPartnerLink = () => {
     trackProductClick(product.id);
     trackCloudProductClick(product.id);
     window.open(product.affiliateUrl, '_blank', 'noopener,noreferrer');
-    onShowToast(`Redirecionando para a loja oficial parceira (${product.store})...`);
+    onShowToast(`Redirecionando para ${product.store}...`);
   };
 
   const getProductShareUrl = () => {
@@ -187,7 +173,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold border shadow-xs backdrop-blur-xs"
               >
                 <StoreLogo store={product.store} size="sm" />
-                <span>Loja Oficial: {product.store}</span>
+                <span>{product.store}</span>
               </span>
             </div>
 
@@ -332,14 +318,26 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
             )}
 
             {/* Full Description Section */}
-            <div className="mb-8">
+            <div className="mb-6">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 mb-3">
-                Descrição Completa
+                Descrição
               </h3>
               <div className="prose prose-slate max-w-none text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line bg-white p-4 rounded-2xl border border-slate-200/80">
                 {product.description}
               </div>
             </div>
+
+            {/* Histórico de Preço (Automático, similar à imagem de referência) */}
+            {(product.price != null || product.originalPrice != null) && (
+              <div className="mb-6">
+                <PriceHistoryChart
+                  productId={product.id}
+                  price={product.price}
+                  originalPrice={product.originalPrice}
+                  customHistory={product.priceHistory}
+                />
+              </div>
+            )}
           </div>
 
           {/* Call to Action Module - Notice: NO PRICE! Explains partner checkout */}
@@ -360,6 +358,30 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                 </span>
               </div>
 
+              {/* Price with strikethrough */}
+              {(product.price != null || product.originalPrice != null) && (
+                <div className="mb-4 pb-3.5 border-b border-slate-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base">💰</span>
+                    {product.originalPrice != null && (
+                      <span className="text-slate-400 line-through text-xs sm:text-sm">
+                        De R$ {product.originalPrice.toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
+                    {product.price != null && (
+                      <span className="font-extrabold text-emerald-400 text-sm sm:text-base">
+                        {product.originalPrice != null ? 'por ' : ''}R$ {product.price.toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
+                  </div>
+                  {product.originalPrice && product.price && product.originalPrice > product.price && (
+                    <span className="text-[11px] font-extrabold text-emerald-300 bg-emerald-950/80 border border-emerald-700/50 px-2 py-0.5 rounded-lg shrink-0">
+                      {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Main Outbound Button */}
               <button
                 onClick={handleOpenPartnerLink}
@@ -367,7 +389,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               >
                 <div className="flex flex-col items-center justify-center leading-snug">
                   <span className="font-bold text-xs sm:text-sm text-orange-100">
-                    ⏳ Ver Desconto (Expira Hoje){product.store ? ` ${storePrep}` : ''}
+                    ⏳ Ver Oferta (Expira Hoje)
                   </span>
                   {product.store && (
                     <span className="font-extrabold text-base sm:text-lg text-white tracking-wide">
@@ -446,7 +468,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
       <div className="fixed bottom-0 inset-x-0 z-30 lg:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/90 p-3 px-4 shadow-xl flex items-center justify-between gap-3">
         <div className="flex-1 min-w-0">
           <span className="text-[10px] font-bold text-orange-600 uppercase block truncate">
-            Loja Oficial {product.store}
+            {product.store}
           </span>
           <p className="text-xs font-bold text-slate-900 truncate">
             {product.title}
@@ -458,7 +480,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
         >
           <div className="flex flex-col items-center text-center leading-tight">
             <span className="text-[10px] font-semibold text-orange-100 whitespace-nowrap">
-              ⏳ Ver Desconto (Expira Hoje){product.store ? ` ${storePrep}` : ''}
+              ⏳ Ver Oferta (Expira Hoje)
             </span>
             {product.store && (
               <span className="text-xs font-black text-white whitespace-nowrap">

@@ -19,6 +19,9 @@ export interface Product {
   description: string;
   highlights: string[];
   badges: string[];
+  originalPrice?: number;
+  price?: number;
+  priceHistory?: Array<{ date: string; price: number }>;
   isFeatured: boolean;
   order?: number;
   realClicksCount?: number;

@@ -251,6 +251,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     description: '',
     highlights: [''] as string[],
     badges: ['Destaque'] as string[],
+    originalPrice: '' as string | number,
+    price: '' as string | number,
     isFeatured: true,
     rating: 4.9,
     reviewCount: 384,
@@ -454,6 +456,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       description: '',
       highlights: [''],
       badges: ['Destaque'],
+      originalPrice: '',
+      price: '',
       isFeatured: true,
       rating: 4.9,
       reviewCount: 384,
@@ -474,6 +478,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       description: p.description,
       highlights: p.highlights && p.highlights.length > 0 ? [...p.highlights] : [''],
       badges: p.badges && p.badges.length > 0 ? [...p.badges] : [],
+      originalPrice: p.originalPrice !== undefined ? p.originalPrice : '',
+      price: p.price !== undefined ? p.price : '',
       isFeatured: p.isFeatured,
       rating: p.rating !== undefined ? p.rating : 4.9,
       reviewCount: p.reviewCount !== undefined ? p.reviewCount : 384,
@@ -524,6 +530,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         swapProductOrdersInCloud({ id: editingProductId, order: desiredOrder });
       }
 
+      const parsedOriginalPrice = formData.originalPrice !== '' && !isNaN(Number(formData.originalPrice)) ? Number(formData.originalPrice) : undefined;
+      const parsedPrice = formData.price !== '' && !isNaN(Number(formData.price)) ? Number(formData.price) : undefined;
+
+      const existingProduct = products.find((p) => p.id === editingProductId);
+      let updatedHistory = existingProduct?.priceHistory ? [...existingProduct.priceHistory] : [];
+      if (parsedPrice && (!existingProduct?.price || existingProduct.price !== parsedPrice)) {
+        updatedHistory.push({
+          date: new Date().toISOString(),
+          price: parsedPrice,
+        });
+      }
+
       const updates = {
         title: formData.title,
         subtitle: formData.subtitle,
@@ -535,6 +553,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         description: formData.description,
         highlights: cleanHighlights,
         badges: formData.badges,
+        originalPrice: parsedOriginalPrice,
+        price: parsedPrice,
+        priceHistory: updatedHistory.length > 0 ? updatedHistory : existingProduct?.priceHistory,
         isFeatured: formData.isFeatured,
         rating: Number(formData.rating) || 4.9,
         reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
@@ -545,6 +566,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       onShowToast('Produto atualizado com sucesso!');
     } else {
       const desiredOrder = Number(formData.order) || (products.length + 1);
+      const parsedOriginalPrice = formData.originalPrice !== '' && !isNaN(Number(formData.originalPrice)) ? Number(formData.originalPrice) : undefined;
+      const parsedPrice = formData.price !== '' && !isNaN(Number(formData.price)) ? Number(formData.price) : undefined;
+
       const created = addProduct({
         title: formData.title,
         subtitle: formData.subtitle,
@@ -556,6 +580,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         description: formData.description || 'Descrição detalhada do achadinho.',
         highlights: cleanHighlights.length > 0 ? cleanHighlights : ['Produto verificado', 'Envio rápido'],
         badges: formData.badges,
+        originalPrice: parsedOriginalPrice,
+        price: parsedPrice,
+        priceHistory: parsedPrice ? [{ date: new Date().toISOString(), price: parsedPrice }] : undefined,
         isFeatured: formData.isFeatured,
         rating: Number(formData.rating) || 4.9,
         reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
@@ -1867,6 +1894,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               />
                               <div className="max-w-xs">
                                 <p className="font-bold text-slate-900 line-clamp-1">{p.title}</p>
+                                {p.price != null && (
+                                  <span className="text-[11px] text-emerald-600 font-semibold block leading-tight">
+                                    💰 {p.originalPrice != null && <span className="line-through text-slate-400 mr-1">De R$ {p.originalPrice.toFixed(2).replace('.', ',')}</span>}
+                                    por R$ {p.price.toFixed(2).replace('.', ',')}
+                                  </span>
+                                )}
                                 <a
                                   href={p.affiliateUrl}
                                   target="_blank"
@@ -2133,6 +2166,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
                 Ao clicar em &quot;Ir à Loja&quot; ou no produto, o usuário será direcionado diretamente para este link.
+              </p>
+            </div>
+
+            {/* Campos de Preço Promocional (Opcionais) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                💰 Preço Anterior (De R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.originalPrice}
+                onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
+                placeholder="Ex: 129.90 (aparecerá riscado)"
+                className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Opcional. Exibe tachado no card: <span className="line-through">De R$ 129,90</span>
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                🏷️ Preço Promocional (Por R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="Ex: 89.90 (preço com desconto)"
+                className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-semibold text-emerald-600"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Opcional. Exibe em destaque verde: <span className="text-emerald-600 font-bold">por R$ 89,90</span>
               </p>
             </div>
 
