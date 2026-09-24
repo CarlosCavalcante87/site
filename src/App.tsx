@@ -42,6 +42,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
 import { updatePageSEO } from './utils/seo';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -502,6 +503,9 @@ export default function App() {
 
       {/* Global Notification Toast */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
