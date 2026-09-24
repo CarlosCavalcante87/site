@@ -9,21 +9,24 @@ import {
   SlidersHorizontal, 
   PackageOpen, 
   X,
-  ShoppingBag
+  ShoppingBag,
+  Star
 } from 'lucide-react';
-import { Product, Category, SortOption, Banner } from './types';
+import { Product, Category, SortOption, Banner, SiteConfig } from './types';
 import { 
   getStoredProducts, 
   getStoredCategories, 
   trackProductClick,
   trackProductView,
   getStoredBanners,
+  getStoredSiteConfig,
   setAdminPassword
 } from './services/storage';
 import {
   subscribeToProducts,
   subscribeToCategories,
   subscribeToBanners,
+  subscribeToSiteConfig,
   subscribeToAdminPassword,
   trackCloudProductClick,
   trackCloudProductView,
@@ -43,6 +46,7 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => getStoredSiteConfig());
   
   // Navigation View State: 'home' | 'detail' | 'admin'
   const [currentView, setCurrentView] = useState<'home' | 'detail' | 'admin'>('home');
@@ -53,6 +57,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStore, setSelectedStore] = useState('');
   const [selectedBadge, setSelectedBadge] = useState('');
+  const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('featured');
 
   // Toast feedback
@@ -63,9 +68,11 @@ export default function App() {
     const loadedProducts = getStoredProducts();
     const loadedCategories = getStoredCategories();
     const loadedBanners = getStoredBanners();
+    const loadedConfig = getStoredSiteConfig();
     setProducts(loadedProducts);
     setCategories(loadedCategories);
     setBanners(loadedBanners);
+    setSiteConfig(loadedConfig);
   };
 
   useEffect(() => {
@@ -97,6 +104,12 @@ export default function App() {
       setAdminPassword(cloudPassword);
     });
 
+    const unsubSiteConfig = subscribeToSiteConfig((cloudConfig) => {
+      if (cloudConfig) {
+        setSiteConfig(cloudConfig);
+      }
+    });
+
     // Check URL hash for direct deep linking (e.g. #produto/prod-1 or #admin)
     const handleHashChange = () => {
       const hash = window.location.hash;
@@ -119,6 +132,7 @@ export default function App() {
       unsubCategories();
       unsubBanners();
       unsubAdminAuth();
+      unsubSiteConfig();
     };
   }, []);
 
@@ -194,7 +208,16 @@ export default function App() {
 
     // Filter by Badge
     if (selectedBadge) {
-      result = result.filter((p) => p.badges && p.badges.includes(selectedBadge));
+      if (selectedBadge === 'Destaque' || selectedBadge === 'Destaques') {
+        result = result.filter((p) => p.isFeatured || (p.badges && p.badges.includes('Destaque')));
+      } else {
+        result = result.filter((p) => p.badges && p.badges.includes(selectedBadge));
+      }
+    }
+
+    // Filter by onlyFeatured
+    if (onlyFeatured) {
+      result = result.filter((p) => p.isFeatured);
     }
 
     // Sorting
@@ -223,7 +246,12 @@ export default function App() {
     }
 
     return result;
-  }, [products, searchQuery, selectedCategory, selectedStore, selectedBadge, sortBy]);
+  }, [products, searchQuery, selectedCategory, selectedStore, selectedBadge, onlyFeatured, sortBy]);
+
+  // Achadinhos marcados no Admin com "Exibir este achadinho com destaque prioritário na página inicial"
+  const featuredProducts = useMemo(() => {
+    return products.filter((p) => p.isFeatured);
+  }, [products]);
 
   // Selected product object for Detail view
   const currentProduct = useMemo(() => {
@@ -231,15 +259,22 @@ export default function App() {
     return products.find((p) => p.id === selectedProductId) || null;
   }, [products, selectedProductId]);
 
-  const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedStore || selectedBadge);
+  const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedStore || selectedBadge || onlyFeatured);
 
   const clearAllFilters = () => {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedStore('');
     setSelectedBadge('');
+    setOnlyFeatured(false);
     setSortBy('featured');
   };
+
+  // Mobile Grid Class based on Admin Configuration (Dupla vs Simples)
+  const isMobileDouble = siteConfig.mobileDoubleColumns !== false;
+  const productsGridClass = isMobileDouble
+    ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-6'
+    : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-slate-800 antialiased">
@@ -282,15 +317,63 @@ export default function App() {
               onSearchChange={setSearchQuery}
             />
 
+            {/* SEÇÃO EXCLUSIVA: ÁREA DE DESTAQUE PRIORITÁRIO */}
+            {featuredProducts.length > 0 && !searchQuery && !selectedCategory && !selectedStore && !selectedBadge && !onlyFeatured && (
+              <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2">
+                <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-white rounded-3xl border-2 border-amber-300 p-5 sm:p-7 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-orange-500/25">
+                        <Sparkles className="w-6 h-6 fill-current" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
+                            Achadinhos em Destaque Prioritário
+                          </h2>
+                          <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-black uppercase tracking-wider shadow-xs">
+                            ★ Top Destaques
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Itens marcados com destaque prioritário no painel administrativo
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-amber-900 bg-amber-100/90 px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-amber-200">
+                        <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                        <span>{featuredProducts.length} {featuredProducts.length === 1 ? 'item em destaque' : 'itens em destaque'}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={productsGridClass}>
+                    {featuredProducts.map((product) => (
+                      <ProductCard
+                        key={`featured-area-${product.id}`}
+                        product={product}
+                        onOpenProduct={handleOpenProduct}
+                        onDirectStoreClick={handleDirectStoreClick}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* Main Products Grid Section */}
             <section id="catalogo-achados" className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
               {/* Controls bar: Results Count & Active Filter Pills */}
-              <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <ShoppingBag className="w-5 h-5 text-orange-600" />
                     <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                      {selectedCategory || 'Todos os Achados do Dia'}
+                      {onlyFeatured 
+                        ? 'Achadinhos em Destaque' 
+                        : (selectedCategory || 'Todos os Achados do Dia')}
                     </h2>
                   </div>
                   <span className="text-xs font-semibold text-slate-500 tabular-nums">
@@ -300,13 +383,27 @@ export default function App() {
                   {hasActiveFilters && (
                     <button
                       onClick={clearAllFilters}
-                      className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium cursor-pointer"
+                      className="ml-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                       Limpar filtros
                     </button>
                   )}
                 </div>
+
+                {featuredProducts.length > 0 && (
+                  <button
+                    onClick={() => setOnlyFeatured(!onlyFeatured)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer w-fit ${
+                      onlyFeatured
+                        ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                        : 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100'
+                    }`}
+                  >
+                    <Star className={`w-3.5 h-3.5 ${onlyFeatured ? 'fill-white text-white' : 'fill-amber-500 text-amber-500'}`} />
+                    <span>{onlyFeatured ? 'Mostrando Apenas Destaques' : 'Ver Apenas Destaques'}</span>
+                  </button>
+                )}
               </div>
 
               {/* Product Cards Grid */}
@@ -327,7 +424,7 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                <div className={productsGridClass}>
                   {filteredProducts.map((product) => (
                     <ProductCard
                       key={product.id}

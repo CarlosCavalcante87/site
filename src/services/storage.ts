@@ -187,7 +187,10 @@ export const getStoredSiteConfig = (): SiteConfig => {
       return INITIAL_SITE_CONFIG;
     }
     const parsed = JSON.parse(raw);
-    return parsed?.whatsappNumber ? parsed : INITIAL_SITE_CONFIG;
+    return {
+      ...INITIAL_SITE_CONFIG,
+      ...(parsed || {}),
+    };
   } catch (error) {
     console.error('Failed to load site config from localStorage', error);
     return INITIAL_SITE_CONFIG;

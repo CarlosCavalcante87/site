@@ -1,7 +1,7 @@
 export type StoreType = 
-  | 'Shopee'
-  | 'Amazon'
   | 'Mercado Livre'
+  | 'Amazon'
+  | 'Shopee'
   | 'Shein'
   | 'Magalu'
   | 'AliExpress'
@@ -57,6 +57,7 @@ export interface Banner {
 export interface SiteConfig {
   whatsappNumber: string;
   whatsappDefaultMessage: string;
+  mobileDoubleColumns?: boolean;
 }
 
 export type SortOption = 'latest' | 'popular' | 'featured' | 'title';

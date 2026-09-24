@@ -344,5 +344,6 @@ export const INITIAL_BANNERS = [
 export const INITIAL_SITE_CONFIG = {
   whatsappNumber: '5511999999999',
   whatsappDefaultMessage: 'Olá! Estava navegando no Achados do Dia e gostaria de tirar algumas dúvidas sobre as ofertas e achadinhos.',
+  mobileDoubleColumns: true,
 };
 

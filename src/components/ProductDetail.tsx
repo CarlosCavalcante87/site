@@ -7,9 +7,8 @@ import {
   Share2, 
   Copy, 
   Check, 
-  ShieldAlert, 
+  ShieldCheck, 
   Sparkles, 
-  MessageCircle, 
   Flame, 
   ChevronRight,
   Maximize2
@@ -18,6 +17,7 @@ import { Product } from '../types';
 import { STORE_CONFIG, trackProductClick } from '../services/storage';
 import { trackCloudProductClick } from '../services/firebaseService';
 import { StoreLogo } from './StoreLogo';
+import { WhatsAppIcon } from './WhatsAppButton';
 
 interface ProductDetailProps {
   product: Product;
@@ -86,10 +86,16 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 3);
 
-  // Preposição gramatical correta: "no Mercado Livre/Magalu/AliExpress" vs "na Shopee/Amazon/Shein"
+  // Preposição gramatical correta: "no Mercado Livre/Magalu/AliExpress/Kabum" vs "na Shopee/Amazon/Shein"
   const storePrep = useMemo(() => {
     const s = (product.store || '').toLowerCase().trim();
-    if (s.includes('mercado livre') || s.includes('aliexpress') || s.includes('magalu')) {
+    if (
+      s.includes('mercado livre') || 
+      s.includes('aliexpress') || 
+      s.includes('magalu') || 
+      s.includes('magazine') ||
+      s.includes('kabum')
+    ) {
       return 'no';
     }
     return 'na';
@@ -242,7 +248,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                 onClick={handleShareWhatsApp}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs no-underline"
               >
-                <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                <WhatsAppIcon className="w-4 h-4 fill-current shrink-0 text-white" />
                 <span>WhatsApp</span>
               </a>
               <button
@@ -339,7 +345,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
           {/* Call to Action Module - Notice: NO PRICE! Explains partner checkout */}
           <div className="bg-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
             <div className="relative z-10">
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center justify-between gap-2 mb-3.5">
                 <span className="text-xs font-semibold text-slate-300">
                   Disponível para compra em:
                 </span>
@@ -354,27 +360,29 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                 </span>
               </div>
 
-              <div className="mb-4">
-                <h4 className="text-lg sm:text-xl font-bold tracking-tight text-white">
-                  Garanta esta oferta na loja oficial
-                </h4>
-              </div>
-
               {/* Main Outbound Button */}
               <button
                 onClick={handleOpenPartnerLink}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 transition-all transform active:scale-98 cursor-pointer"
+                className="w-full py-3.5 sm:py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 transition-all transform active:scale-98 cursor-pointer flex items-center justify-center gap-3 text-center"
               >
-                <span>Pegar Oferta {storePrep} {product.store}</span>
-                <ExternalLink className="w-5 h-5" />
+                <div className="flex flex-col items-center justify-center leading-snug">
+                  <span className="font-bold text-xs sm:text-sm text-orange-100">
+                    ⏳ Ver Desconto (Expira Hoje){product.store ? ` ${storePrep}` : ''}
+                  </span>
+                  {product.store && (
+                    <span className="font-extrabold text-base sm:text-lg text-white tracking-wide">
+                      {product.store}
+                    </span>
+                  )}
+                </div>
+                <ExternalLink className="w-5 h-5 shrink-0 text-white" />
               </button>
 
-              <div className="mt-3 flex flex-col items-center justify-center text-center gap-1 text-[11px] text-slate-400">
-                <div className="flex items-center justify-center gap-1.5 font-medium text-emerald-400">
-                  <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                  <span>Link oficial verificado</span>
+              <div className="mt-3.5 flex items-center justify-center">
+                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 w-fit">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Compras 100% seguras nas lojas oficiais</span>
                 </div>
-                <span>Compra 100% segura no ambiente da loja parceira</span>
               </div>
             </div>
           </div>
@@ -446,10 +454,19 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
         </div>
         <button
           onClick={handleOpenPartnerLink}
-          className="shrink-0 py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
+          className="shrink-0 py-1.5 sm:py-2 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
         >
-          <span>Pegar Oferta</span>
-          <ExternalLink className="w-3.5 h-3.5" />
+          <div className="flex flex-col items-center text-center leading-tight">
+            <span className="text-[10px] font-semibold text-orange-100 whitespace-nowrap">
+              ⏳ Ver Desconto (Expira Hoje){product.store ? ` ${storePrep}` : ''}
+            </span>
+            {product.store && (
+              <span className="text-xs font-black text-white whitespace-nowrap">
+                {product.store}
+              </span>
+            )}
+          </div>
+          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
         </button>
       </div>
 

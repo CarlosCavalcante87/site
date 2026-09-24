@@ -59,8 +59,13 @@ import {
   Shirt,
   Dumbbell,
   Car,
-  Dog
+  Dog,
+  Loader2
 } from 'lucide-react';
+import {
+  removeBannerImage,
+  uploadBannerImage
+} from '../services/bannerUpload';
 
 export const CATEGORY_ICON_GROUPS = [
   {
@@ -174,7 +179,7 @@ import {
   saveAdminPasswordToCloud
 } from '../services/firebaseService';
 import { BannerGuideModal } from './BannerGuideModal';
-import { uploadBannerImage } from '../services/bannerUpload';
+import { WhatsAppIcon } from './WhatsAppButton';
 
 interface AdminPanelProps {
   products: Product[];
@@ -185,7 +190,7 @@ interface AdminPanelProps {
   onViewProduct: (product: Product) => void;
 }
 
-const STORES_LIST: StoreType[] = ['Shopee', 'Amazon', 'Mercado Livre', 'Shein', 'Magalu', 'AliExpress', 'Outro'];
+const STORES_LIST: StoreType[] = ['Mercado Livre', 'Amazon', 'Shopee', 'Shein', 'Magalu', 'AliExpress', 'Outro'];
 
 const BADGE_PRESETS = [
   'Destaque',
@@ -219,6 +224,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Banners & Site Settings State
   const [banners, setBanners] = useState<Banner[]>(() => getStoredBanners());
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [bannerUploadProgress, setBannerUploadProgress] = useState(0);
+  const [showManualBannerUrl, setShowManualBannerUrl] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => getStoredSiteConfig());
 
@@ -366,6 +374,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setPasswordChangeSuccess(`Senha redefinida para o padrão de fábrica: "${DEFAULT_ADMIN_CONFIG.defaultPassword}"`);
       setPasswordChangeError(null);
       onShowToast('Senha padrão restaurada na nuvem!');
+    }
+  };
+
+  // Handle Banner File Processing (Upload or Instant Optimization)
+  const handleProcessBannerFile = async (file: File) => {
+    if (!file || !editingBanner) return;
+    
+    if (file.size > 10 * 1024 * 1024) {
+      onShowToast('A imagem deve ter no máximo 10 MB.');
+      return;
+    }
+
+    setIsUploadingBanner(true);
+    setBannerUploadProgress(15);
+
+    // Hard safety timer: guarantee the loader disappears within 3s under any condition
+    const safetyTimer = setTimeout(() => {
+      setIsUploadingBanner(false);
+    }, 3000);
+
+    try {
+      const url = await uploadBannerImage(file, editingBanner.id, (prog) => {
+        setBannerUploadProgress(prog);
+      });
+      clearTimeout(safetyTimer);
+      setEditingBanner((current) => current ? { ...current, imageUrl: url } : current);
+      onShowToast('Imagem do banner carregada com sucesso!');
+    } catch (error: any) {
+      clearTimeout(safetyTimer);
+      console.error('Banner upload error:', error);
+      onShowToast('Erro ao processar imagem. Tente novamente.');
+    } finally {
+      setIsUploadingBanner(false);
     }
   };
 
@@ -891,7 +932,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={onCloseAdmin}
-              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1"
+              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 border border-transparent text-slate-700 font-semibold text-xs transition-all duration-200 cursor-pointer flex items-center gap-1 hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0"
               title="Voltar para a loja pública"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -899,10 +940,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
             <button
               onClick={handleLogout}
-              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1"
+              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-transparent text-slate-600 font-semibold text-xs transition-all duration-200 cursor-pointer flex items-center gap-1 hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0"
               title="Encerrar sessão de administrador"
             >
-              <LogOut className="w-3.5 h-3.5 text-slate-500" />
+              <LogOut className="w-3.5 h-3.5 text-slate-500 group-hover:text-rose-600" />
               <span className="hidden xs:inline">Sair</span>
             </button>
           </div>
@@ -915,18 +956,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               resetForm();
               setActiveTab('new-product');
             }}
-            className="col-span-2 sm:col-auto px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs shadow-orange-500/20"
+            className="col-span-2 sm:col-auto px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer shadow-sm shadow-orange-500/25 hover:shadow-lg hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 hover:ring-2 hover:ring-orange-400/50"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Cadastrar Novo Produto</span>
+            <span>Cadastrar Novo Produto</span>
           </button>
 
           <button
             onClick={() => setActiveTab('banners')}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'banners'
-                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                ? 'bg-orange-600 text-white border-orange-600 shadow-sm shadow-orange-500/20 hover:bg-orange-700'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 hover:shadow-xs'
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5 text-orange-500" />
@@ -935,10 +976,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'security'
-                ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-xs'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-xs hover:bg-amber-600 hover:text-white'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 hover:shadow-xs'
             }`}
             title="Alterar senha do administrador"
           >
@@ -951,37 +992,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto mt-4 pt-3 border-t border-slate-100 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
           <button
             onClick={() => setActiveTab('products')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'products'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
             <Package className="w-3.5 h-3.5" />
             <span>Produtos ({products.length})</span>
           </button>
 
-          <button
-            onClick={() => {
-              resetForm();
-              setActiveTab('new-product');
-            }}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-              activeTab === 'new-product'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{editingProductId ? 'Editar' : 'Novo'}</span>
-          </button>
+          {editingProductId && (
+            <button
+              onClick={() => setActiveTab('new-product')}
+              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+                activeTab === 'new-product'
+                  ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                  : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
+              }`}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Editando Produto</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('banners')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'banners'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5" />
@@ -990,10 +1030,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('categories')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'categories'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -1002,10 +1042,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('stats')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'stats'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
@@ -1014,10 +1054,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'security'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
             <KeyRound className="w-3.5 h-3.5" />
@@ -1026,10 +1066,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('backup')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'backup'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
             <Download className="w-3.5 h-3.5" />
@@ -1280,59 +1320,128 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Imagem do Banner (Recomendado: 1200 x 360 px) *
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-2">
+                      Upload da Imagem do Banner (Recomendado: 1200 x 360 px) *
                     </label>
-                    <div className="space-y-3">
-                      <label className="flex flex-col items-center justify-center w-full min-h-36 px-4 py-5 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-orange-50 hover:border-orange-300 transition-colors cursor-pointer">
-                        <ImageIcon className="w-8 h-8 text-orange-500 mb-2" />
-                        <span className="text-sm font-bold text-slate-700">Selecionar imagem</span>
-                        <span className="text-[11px] text-slate-500 mt-1 text-center">JPG, JPEG, PNG ou WEBP • até 5 MB</span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file || !editingBanner) return;
-                            if (!file.type.startsWith('image/')) {
-                              onShowToast('Selecione uma imagem válida.');
-                              e.target.value = '';
-                              return;
-                            }
-                            if (file.size > 5 * 1024 * 1024) {
-                              onShowToast('A imagem deve ter no máximo 5 MB.');
-                              e.target.value = '';
-                              return;
-                            }
-                            try {
-                              onShowToast('Enviando imagem do banner...');
-                              const url = await uploadBannerImage(file, editingBanner.id);
-                              setEditingBanner((current) => current ? { ...current, imageUrl: url } : current);
-                              onShowToast('Imagem do banner enviada com sucesso!');
-                            } catch (error) {
-                              console.error('Banner upload error:', error);
-                              onShowToast('Não foi possível enviar a imagem. Verifique o Firebase Storage.');
-                            } finally {
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                      </label>
 
-                      {editingBanner.imageUrl && (
-                        <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-900">
-                          <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span className="text-[11px] font-semibold text-slate-700">Pré-visualização do banner</span>
+                    <div className="space-y-3">
+                      {/* Upload em andamento */}
+                      {isUploadingBanner && (
+                        <div className="p-5 bg-orange-50/80 border-2 border-orange-300 rounded-2xl flex flex-col items-center justify-center text-center">
+                          <Loader2 className="w-8 h-8 text-orange-600 animate-spin mb-2" />
+                          <span className="text-sm font-bold text-slate-800">Otimizando e carregando banner...</span>
+                          <span className="text-xs text-orange-600 font-semibold mt-1">{bannerUploadProgress}% concluído</span>
+                          <div className="w-full max-w-xs bg-orange-200/70 h-2 rounded-full mt-3 overflow-hidden">
+                            <div 
+                              className="bg-orange-600 h-full transition-all duration-200" 
+                              style={{ width: `${bannerUploadProgress}%` }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsUploadingBanner(false)}
+                            className="mt-3 text-[11px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Caso já exista imagem carregada */}
+                      {!isUploadingBanner && editingBanner.imageUrl ? (
+                        <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-900 shadow-sm">
+                          <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span className="text-xs font-bold text-slate-700">Imagem Carregada</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <label className="text-xs text-orange-600 hover:text-orange-700 font-bold cursor-pointer flex items-center gap-1">
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Substituir</span>
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp,image/avif"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleProcessBannerFile(file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                              <span className="text-slate-300">|</span>
+                              <button
+                                type="button"
+                                onClick={() => setEditingBanner({ ...editingBanner, imageUrl: '' })}
+                                className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remover</span>
+                              </button>
+                            </div>
                           </div>
                           <img
                             src={editingBanner.imageUrl}
                             alt="Pré-visualização do banner"
                             className="w-full max-h-48 object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
+                            }}
                           />
                         </div>
+                      ) : (
+                        /* Área de Upload (quando não há imagem ainda) */
+                        !isUploadingBanner && (
+                          <label className="flex flex-col items-center justify-center w-full min-h-36 px-4 py-6 rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50/40 hover:bg-orange-50/80 hover:border-orange-500 transition-all cursor-pointer group">
+                            <div className="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 mb-3 group-hover:scale-105 transition-transform">
+                              <Upload className="w-6 h-6" />
+                            </div>
+                            <span className="text-sm font-bold text-slate-800 text-center">
+                              Clique aqui para fazer upload da imagem do banner
+                            </span>
+                            <span className="text-[11px] text-slate-500 mt-1 text-center">
+                              Formatos aceitos: JPG, PNG, WEBP &bull; Até 10 MB
+                            </span>
+                            <span className="mt-3 px-4 py-1.5 rounded-xl bg-orange-600 text-white text-xs font-bold shadow-xs group-hover:bg-orange-700">
+                              Selecionar Imagem
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/avif"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleProcessBannerFile(file);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        )
                       )}
+
+                      {/* Opção secundária para quem preferir colar link/URL */}
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowManualBannerUrl(!showManualBannerUrl)}
+                          className="text-[11px] text-slate-500 hover:text-slate-700 underline font-medium cursor-pointer"
+                        >
+                          {showManualBannerUrl ? 'Ocultar inserção por URL' : 'Prefere colar a URL da imagem em vez de enviar o arquivo? Clique aqui'}
+                        </button>
+                        
+                        {showManualBannerUrl && (
+                          <div className="mt-2">
+                            <input
+                              type="text"
+                              value={editingBanner.imageUrl}
+                              onChange={(e) => setEditingBanner({ ...editingBanner, imageUrl: e.target.value })}
+                              placeholder="https://exemplo.com/imagem-do-banner.webp"
+                              className="w-full px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1377,7 +1486,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
             <div className="flex items-center gap-3 pb-4 mb-6 border-b border-slate-100">
               <div className="w-10 h-10 rounded-2xl bg-[#25D366] text-white flex items-center justify-center font-bold shadow-xs">
-                <MessageCircle className="w-5 h-5 fill-current" />
+                <WhatsAppIcon className="w-5 h-5 fill-current" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">
@@ -1428,6 +1537,124 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span>Salvar Configuração do WhatsApp</span>
               </button>
             </form>
+          </div>
+
+          {/* Configuração de Layout Mobile: Visualização Dupla (2 colunas) vs Simples (1 coluna) */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+            <div className="flex items-center gap-3 pb-4 mb-6 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-2xl bg-orange-600 text-white flex items-center justify-center font-bold shadow-xs">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Visualização dos Cards em Dispositivos Mobile (Celulares)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Ative ou desative a exibição dupla (2 colunas lado a lado) para visitantes que acessam pelo celular.
+                </p>
+              </div>
+            </div>
+
+            <div className="max-w-xl space-y-4">
+              <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-slate-900">
+                      Visualização Dupla (2 Cards por Linha)
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                      siteConfig.mobileDoubleColumns !== false
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {siteConfig.mobileDoubleColumns !== false ? '● Ativado (2 Colunas)' : '○ Desativado (1 Coluna)'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                    {siteConfig.mobileDoubleColumns !== false
+                      ? 'Ativado: Exibe 2 produtos lado a lado na tela do celular (formato vitrine compacta da Shopee / Mercado Livre). Permite ver mais achadinhos sem rolar muito.'
+                      : 'Desativado: Exibe 1 produto em destaque por linha na tela do celular (cards largos com largura total).'}
+                  </p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                  <input
+                    type="checkbox"
+                    checked={siteConfig.mobileDoubleColumns !== false}
+                    onChange={(e) => {
+                      const updated = { ...siteConfig, mobileDoubleColumns: e.target.checked };
+                      setSiteConfig(updated);
+                      saveStoredSiteConfig(updated);
+                      saveSiteConfigToCloud(updated);
+                      onShowToast(
+                        e.target.checked
+                          ? 'Visualização dupla (2 colunas) no mobile ativada!'
+                          : 'Visualização simples (1 coluna) no mobile ativada!'
+                      );
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                </label>
+              </div>
+
+              {/* Botões seletores visuais */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...siteConfig, mobileDoubleColumns: true };
+                    setSiteConfig(updated);
+                    saveStoredSiteConfig(updated);
+                    saveSiteConfigToCloud(updated);
+                    onShowToast('Visualização dupla (2 colunas) ativada no celular!');
+                  }}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                    siteConfig.mobileDoubleColumns !== false
+                      ? 'border-orange-500 bg-orange-50/70 ring-2 ring-orange-400/30'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-5 h-7 border-2 border-slate-700 rounded-sm flex items-center justify-center gap-0.5 p-0.5">
+                      <div className="w-1.5 h-4 bg-orange-500 rounded-2xs"></div>
+                      <div className="w-1.5 h-4 bg-orange-500 rounded-2xs"></div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">2 Colunas (Dupla)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Estilo Shopee/Instagram. Mais ofertas visíveis por tela.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...siteConfig, mobileDoubleColumns: false };
+                    setSiteConfig(updated);
+                    saveStoredSiteConfig(updated);
+                    saveSiteConfigToCloud(updated);
+                    onShowToast('Visualização simples (1 coluna) ativada no celular!');
+                  }}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                    siteConfig.mobileDoubleColumns === false
+                      ? 'border-orange-500 bg-orange-50/70 ring-2 ring-orange-400/30'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-5 h-7 border-2 border-slate-700 rounded-sm flex flex-col items-center justify-center gap-0.5 p-0.5">
+                      <div className="w-3.5 h-1.5 bg-orange-500 rounded-2xs"></div>
+                      <div className="w-3.5 h-1.5 bg-orange-500 rounded-2xs"></div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">1 Coluna (Simples)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Cards grandes ocupando toda a largura do celular.
+                  </p>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

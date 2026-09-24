@@ -4,27 +4,40 @@ import { Flame, ShieldCheck, Lock, CheckCircle2 } from 'lucide-react';
 interface FooterProps {
   onGoHome?: () => void;
   onOpenAdmin: () => void;
-  onSelectCategory: (cat: string) => void;
+  onSelectCategory?: (cat: string) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onOpenAdmin,
-  onSelectCategory,
+  onGoHome,
 }) => {
+  const handleScrollToTop = () => {
+    onGoHome?.();
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
+
   return (
     <footer className="bg-white border-t border-slate-200 mt-16 text-slate-600">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           {/* Col 1: Brand & Key Guarantees */}
-          <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center">
+          <div className="md:col-span-7">
+            <button
+              type="button"
+              onClick={handleScrollToTop}
+              className="flex items-center gap-2 mb-3 cursor-pointer group text-left transition-transform active:scale-95"
+              title="Voltar ao topo"
+            >
+              <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center group-hover:bg-orange-700 transition-colors shadow-xs">
                 <Flame className="w-5 h-5 fill-current" />
               </div>
-              <span className="font-extrabold text-slate-900 text-lg font-display">
+              <span className="font-extrabold text-slate-900 text-lg font-display group-hover:text-orange-600 transition-colors">
                 Achados do Dia
               </span>
-            </div>
+            </button>
             <ul className="space-y-2 mb-4 text-xs text-slate-600">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -45,71 +58,32 @@ export const Footer: React.FC<FooterProps> = ({
             </div>
           </div>
 
-          {/* Col 2: Quick Links */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">
-              Categorias Populares
-            </h4>
-            <ul className="space-y-2 text-xs">
-              <li>
-                <button
-                  onClick={() => onSelectCategory('Organizadores')}
-                  className="hover:text-orange-600 transition-colors cursor-pointer"
-                >
-                  Organizadores
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => onSelectCategory('Cozinha & Casa')}
-                  className="hover:text-orange-600 transition-colors cursor-pointer"
-                >
-                  Cozinha & Utensílios
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => onSelectCategory('Tecnologia & Gadgets')}
-                  className="hover:text-orange-600 transition-colors cursor-pointer"
-                >
-                  Tecnologia & Gadgets
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => onSelectCategory('Casa & Conforto')}
-                  className="hover:text-orange-600 transition-colors cursor-pointer"
-                >
-                  Casa & Aconchego
-                </button>
-              </li>
-            </ul>
-          </div>
-        </div>
+          {/* Col 2: Aviso de transparência, Copyright e Acesso Admin */}
+          <div className="md:col-span-5 bg-slate-50/80 rounded-2xl p-5 border border-slate-200/80 flex flex-col justify-between space-y-4">
+            <div className="space-y-1.5 text-xs text-center md:text-left">
+              <p className="font-bold text-slate-900">
+                Aviso de transparência:
+              </p>
+              <p className="text-slate-600 text-[11px] sm:text-xs leading-relaxed md:whitespace-nowrap">
+                Seus cliques ajudam a manter nossas promoções <br className="md:hidden" />diárias no ar!
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Preços e disponibilidade sujeitos a alteração.
+              </p>
+            </div>
 
-        {/* Affiliate Disclosure Notice */}
-        <div className="pt-8 border-t border-slate-100 text-[11px] text-slate-600 leading-normal flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="max-w-2xl text-center sm:text-left space-y-0.5">
-            <p>
-              <strong>Aviso de transparência:</strong>
-              <br />
-              Seus cliques ajudam a manter nossas promoções diárias no ar!
-            </p>
-            <p>
-              Preços e disponibilidade sujeitos a alteração.
-            </p>
-          </div>
-          <div className="text-slate-600 shrink-0 text-center sm:text-right flex items-center justify-center sm:justify-end gap-3">
-            <span>© {new Date().getFullYear()} Achados do Dia.</span>
-            <span className="text-slate-300">•</span>
-            <button
-              onClick={onOpenAdmin}
-              className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 text-[11px] font-medium transition-colors cursor-pointer"
-              title="Acessar painel administrativo"
-            >
-              <Lock className="w-3 h-3 text-slate-400" />
-              <span>Acesso Admin</span>
-            </button>
+            <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-600">
+              <span>© {new Date().getFullYear()} Achados do Dia.</span>
+              <span className="text-slate-300">•</span>
+              <button
+                onClick={onOpenAdmin}
+                className="inline-flex items-center gap-1.5 text-slate-500 hover:text-orange-600 font-semibold transition-colors cursor-pointer"
+                title="Acessar painel administrativo"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                <span>Acesso Admin</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

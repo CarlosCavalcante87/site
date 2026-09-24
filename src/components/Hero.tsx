@@ -11,14 +11,15 @@ interface HeroProps {
   products?: Product[];
 }
 
-const DEFAULT_STORE_ORDER: StoreType[] = ['Shopee', 'Amazon', 'Mercado Livre', 'Shein', 'Magalu', 'AliExpress'];
+const DEFAULT_STORE_ORDER: StoreType[] = ['Mercado Livre', 'Amazon', 'Shopee', 'Shein', 'Magalu', 'AliExpress'];
 
 export const Hero: React.FC<HeroProps> = ({
   selectedStore,
   onSelectStore,
   products = [],
 }) => {
-  // Only display stores that actually have at least 1 product registered in the catalog
+  // Only display stores that actually have at least 1 product registered in the catalog,
+  // ordered strictly by priority: Mercado Livre, Amazon, Shopee, Shein, etc.
   const availableStores = useMemo(() => {
     if (!products || products.length === 0) {
       return [];
@@ -27,14 +28,15 @@ export const Hero: React.FC<HeroProps> = ({
     const storeCounts = new Map<string, number>();
     products.forEach((p) => {
       if (p.store) {
-        storeCounts.set(p.store, (storeCounts.get(p.store) || 0) + 1);
+        const storeName = p.store.trim();
+        storeCounts.set(storeName, (storeCounts.get(storeName) || 0) + 1);
       }
     });
 
-    // Only stores that have at least 1 product
+    // Only stores that have at least 1 active product in the catalog
     const active = DEFAULT_STORE_ORDER.filter((s) => (storeCounts.get(s) || 0) > 0);
 
-    // Also include any other store from products that is not in DEFAULT_STORE_ORDER
+    // Also include any other store with offers not in DEFAULT_STORE_ORDER
     storeCounts.forEach((count, s) => {
       if (count > 0 && !active.includes(s as StoreType)) {
         active.push(s as StoreType);
