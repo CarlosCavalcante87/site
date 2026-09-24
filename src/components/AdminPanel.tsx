@@ -180,6 +180,19 @@ import {
 } from '../services/firebaseService';
 import { BannerGuideModal } from './BannerGuideModal';
 import { WhatsAppIcon } from './WhatsAppButton';
+import {
+  loginWithGoogleAuth,
+  loginWithFirebaseAuth,
+  registerAdminWithFirebaseAuth,
+  logoutFirebaseAuth,
+  getFriendlyAuthErrorMessage,
+  ADMIN_PRIMARY_EMAIL,
+  updateFirebaseAdminPassword,
+  getCurrentAuthUser,
+  onAuthUserChanged,
+} from '../services/authService';
+import { auth } from '../firebase';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 interface AdminPanelProps {
   products: Product[];
@@ -212,10 +225,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
   // Authentication State
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => getAdminSession());
+  const [currentAuthUser, setCurrentAuthUser] = useState<FirebaseUser | null>(() => getCurrentAuthUser());
   const [loginUser, setLoginUser] = useState('admin');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = onAuthUserChanged((u) => {
+      setCurrentAuthUser(u);
+      if (u) {
+        setAdminSession(true);
+        setIsAdminLoggedIn(true);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Tab navigation
   const [activeTab, setActiveTab] = useState<'products' | 'new-product' | 'banners' | 'categories' | 'stats' | 'security' | 'backup'>('products');
@@ -272,8 +297,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     .sort((a, b) => (b.realClicksCount || 0) - (a.realClicksCount || 0))
     .slice(0, 5);
 
-  // Handle Login Action
+  // Handle Login Actions
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // 1-Click Google Sign-In with 87informatica@gmail.com
+  const handleGoogleLogin = async () => {
+    setLoginError(null);
+    setIsLoggingIn(true);
+    try {
+      const user = await loginWithGoogleAuth();
+      if (user) {
+        const userEmail = (user.email || '').toLowerCase();
+        if (
+          userEmail === ADMIN_PRIMARY_EMAIL.toLowerCase() ||
+          userEmail.endsWith('@achadosdodia.com')
+        ) {
+          setAdminSession(true);
+          setIsAdminLoggedIn(true);
+          onShowToast(`Login com Google realizado (${user.email})!`);
+        } else {
+          await logoutFirebaseAuth();
+          setAdminSession(false);
+          setIsAdminLoggedIn(false);
+          setLoginError(
+            `Acesso negado: a conta ${user.email} não tem permissão de administrador. Utilize ${ADMIN_PRIMARY_EMAIL}.`
+          );
+        }
+      }
+    } catch (err: unknown) {
+      const authErr = err as { code?: string };
+      if (
+        authErr?.code === 'auth/popup-closed-by-user' ||
+        authErr?.code === 'auth/cancelled-popup-request'
+      ) {
+        return;
+      }
+      setLoginError(
+        getFriendlyAuthErrorMessage(authErr?.code || '') ||
+          'Erro ao realizar login com Google. Tente novamente ou use usuário e senha.'
+      );
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,19 +347,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsLoggingIn(true);
 
     try {
-      // 1. Check with local storage credentials
-      let isValid = verifyAdminCredentials(loginUser, loginPassword);
+      // 1. Try authenticating via Firebase Auth (Email/Password)
+      let firebaseUser: FirebaseUser | null = null;
+      try {
+        firebaseUser = await loginWithFirebaseAuth(loginUser, loginPassword);
+      } catch (authErr: unknown) {
+        const code = (authErr as { code?: string })?.code;
+        // If account not yet registered in Firebase Auth, check fallback credentials and auto-register
+        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+          let isValid = verifyAdminCredentials(loginUser, loginPassword);
+          if (!isValid) {
+            const cloudPass = (await fetchAdminPasswordFromCloud()).trim();
+            const trimmedUser = loginUser.trim().toLowerCase();
+            const trimmedPass = loginPassword.trim();
+            const validUser =
+              trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase() ||
+              trimmedUser === 'admin@achadosdodia.com.br' ||
+              trimmedUser === ADMIN_PRIMARY_EMAIL.toLowerCase();
+            if (validUser && trimmedPass === cloudPass) {
+              isValid = true;
+              setAdminPassword(cloudPass);
+            }
+          }
 
-      // 2. If it fails, fetch the true cloud password directly from Firestore (handles multi-device / incognito)
+          if (isValid) {
+            // Auto-provision into Firebase Auth for seamless cloud sync
+            try {
+              firebaseUser = await registerAdminWithFirebaseAuth(loginUser, loginPassword);
+            } catch {
+              // registration might fail if password is under 6 chars; fallback to credential session
+            }
+          }
+        } else if (code !== 'auth/wrong-password') {
+          throw authErr;
+        }
+      }
+
+      // Check validation
+      let isValid = !!firebaseUser || verifyAdminCredentials(loginUser, loginPassword);
+
       if (!isValid) {
         const cloudPass = (await fetchAdminPasswordFromCloud()).trim();
         const trimmedUser = loginUser.trim().toLowerCase();
         const trimmedPass = loginPassword.trim();
-        const validUser = (trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase()) || 
-                          (trimmedUser === 'admin@achadosdodia.com.br');
+        const validUser =
+          trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase() ||
+          trimmedUser === 'admin@achadosdodia.com.br' ||
+          trimmedUser === ADMIN_PRIMARY_EMAIL.toLowerCase();
         if (validUser && trimmedPass === cloudPass) {
           isValid = true;
-          // Synchronize local password immediately
           setAdminPassword(cloudPass);
         }
       }
@@ -306,15 +408,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       } else {
         setLoginError('Credenciais incorretas. Verifique o usuário e a senha informados.');
       }
-    } catch {
-      setLoginError('Erro ao validar acesso. Verifique sua conexão e tente novamente.');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      setLoginError(
+        getFriendlyAuthErrorMessage(code || '') ||
+          'Erro ao validar acesso. Verifique sua conexão e tente novamente.'
+      );
     } finally {
       setIsLoggingIn(false);
     }
   };
 
   // Logout Action
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logoutFirebaseAuth();
+    } catch {
+      // ignore
+    }
     setAdminSession(false);
     setIsAdminLoggedIn(false);
     setLoginPassword('');
@@ -847,6 +958,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>{loginError}</span>
             </div>
           )}
+
+          {/* Google 1-Click Secure Login Button */}
+          <div className="mb-4">
+            <button
+              type="button"
+              disabled={isLoggingIn}
+              onClick={handleGoogleLogin}
+              className="w-full py-3 px-4 bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs disabled:opacity-60 group"
+            >
+              <svg className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.98 0 12s.45 3.83 1.25 5.42l4.03-3.15z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                />
+              </svg>
+              <span>Entrar com Google ({ADMIN_PRIMARY_EMAIL})</span>
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative flex py-2 items-center mb-4">
+            <div className="flex-grow border-t border-slate-200"></div>
+            <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              ou com usuário e senha
+            </span>
+            <div className="flex-grow border-t border-slate-200"></div>
+          </div>
 
           {/* Login Form */}
           <form onSubmit={handleLoginSubmit} className="space-y-4 mb-6">

@@ -1,6 +1,8 @@
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
   updatePassword,
@@ -13,6 +15,19 @@ export interface AuthState {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+}
+
+export const ADMIN_PRIMARY_EMAIL = '87informatica@gmail.com';
+
+/**
+ * Checks whether a given user is the authorized store admin.
+ */
+export function isAuthorizedAdmin(user: User | null): boolean {
+  if (!user) return false;
+  if (user.email?.toLowerCase() === ADMIN_PRIMARY_EMAIL.toLowerCase()) return true;
+  // If user signed in via custom admin auth
+  if (user.email?.toLowerCase().endsWith('@achadosdodia.com')) return true;
+  return false;
 }
 
 /**
@@ -72,6 +87,19 @@ export async function registerAdminWithFirebaseAuth(emailOrUser: string, passwor
   const email = normalizeAdminEmail(emailOrUser);
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   return userCredential.user;
+}
+
+/**
+ * Sign in admin user with Google Authentication (1-click secure login).
+ */
+export async function loginWithGoogleAuth(): Promise<User> {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account',
+    login_hint: ADMIN_PRIMARY_EMAIL,
+  });
+  const result = await signInWithPopup(auth, provider);
+  return result.user;
 }
 
 /**

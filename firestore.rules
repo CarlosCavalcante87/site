@@ -1,28 +1,80 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Products collection: public read, write allowed for app
+
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Security Primitives
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Trusted Admin Verification: matches the owner's authenticated Google account or registered admin UID
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == '87informatica@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Products Collection: Public read catalog, secure admin write, public click tracking
     match /products/{productId} {
       allow read: if true;
-      allow write: if true;
+      allow create: if isAdmin() && isValidId(productId);
+      allow delete: if isAdmin() && isValidId(productId);
+      allow update: if isValidId(productId) && (
+        isAdmin() ||
+        // Tiered Public Click Tracking Action (Only click counters can be incremented by visitors)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['clicksCount', 'realClicksCount']))
+      );
     }
 
-    // Categories collection: public read, write allowed for app
+    // Categories Collection: Public read, Admin write
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAdmin() && isValidId(categoryId);
     }
 
-    // Banners collection: public read, write allowed for app
+    // Banners Collection: Public read, Admin write
     match /banners/{bannerId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAdmin() && isValidId(bannerId);
     }
 
-    // Site settings: public read, write allowed for app
-    match /settings/{settingId} {
+    // Site Settings:
+    // - siteConfig is public read (store branding, WhatsApp support)
+    // - adminAuth is STRICTLY PRIVATE (only authenticated admin can read or write)
+    match /settings/siteConfig {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/adminAuth {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/{otherSetting} {
+      allow read, write: if isAdmin();
+    }
+
+    // Admins registry: Only admins can manage admins
+    match /admins/{adminId} {
+      allow read, write: if isAdmin() && isValidId(adminId);
     }
   }
 }
