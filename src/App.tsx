@@ -107,10 +107,16 @@ export default function App() {
       }
     });
 
-    // Check URL hash for direct deep linking (e.g. #produto/prod-1 or #admin)
-    const handleHashChange = () => {
+    // Check URL query and hash for direct deep linking (e.g. ?p=prod-1, #produto/prod-1, or #admin)
+    const handleUrlRoute = () => {
       const hash = window.location.hash;
-      if (hash.startsWith('#produto/')) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryProdId = urlParams.get('p') || urlParams.get('produto');
+
+      if (queryProdId) {
+        setSelectedProductId(queryProdId);
+        setCurrentView('detail');
+      } else if (hash.startsWith('#produto/')) {
         const prodId = hash.replace('#produto/', '');
         setSelectedProductId(prodId);
         setCurrentView('detail');
@@ -121,10 +127,12 @@ export default function App() {
       }
     };
 
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
+    handleUrlRoute();
+    window.addEventListener('hashchange', handleUrlRoute);
+    window.addEventListener('popstate', handleUrlRoute);
     return () => {
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('hashchange', handleUrlRoute);
+      window.removeEventListener('popstate', handleUrlRoute);
       unsubProducts();
       unsubCategories();
       unsubBanners();
@@ -259,7 +267,7 @@ export default function App() {
   useEffect(() => {
     if (currentView === 'detail' && currentProduct) {
       updatePageSEO({
-        title: `${currentProduct.title} | Achados do Dia`,
+        title: `${currentProduct.title} | Ofertas do Dia`,
         description: currentProduct.description 
           ? currentProduct.description.slice(0, 160)
           : `Confira a oferta oficial de ${currentProduct.title} na ${currentProduct.store}. Link oficial verificado!`,
@@ -273,8 +281,8 @@ export default function App() {
       const bannerImage = firstBanner?.imageUrl || '/og-image.jpg';
 
       updatePageSEO({
-        title: 'Achados do Dia - Melhores Ofertas e Achadinhos da Internet',
-        description: 'Agregador de ofertas e achadinhos das melhores lojas online. Encontre os produtos mais virais e recomendados com links diretos para compra.',
+        title: 'Ofertas do Dia - Melhores Ofertas e Promoções da Internet',
+        description: 'Agregador de ofertas e promoções das melhores lojas online. Encontre os produtos mais virais e recomendados com links diretos para compra.',
         image: bannerImage,
         url: typeof window !== 'undefined' ? window.location.origin : ''
       });
@@ -318,7 +326,7 @@ export default function App() {
         {/* VIEW 1: HOME PAGE (Catalog + Prominent Categories) */}
         {currentView === 'home' && (
           <div>
-            {/* 3 Banners Section right at the top (where the text 'Achados do Dia para Facilitar a Sua Vida' was) */}
+            {/* 3 Banners Section right at the top (where the text 'Ofertas do Dia para Facilitar a Sua Vida' was) */}
             <BannerSlider
               banners={banners}
               onSelectCategory={(catName) => {
@@ -400,8 +408,8 @@ export default function App() {
                     <ShoppingBag className="w-5 h-5 text-orange-600" />
                     <h2 className="text-lg sm:text-xl font-bold text-slate-900">
                       {onlyFeatured 
-                        ? 'Achadinhos em Destaque' 
-                        : (selectedCategory || 'Todos os Achados do Dia')}
+                        ? 'Ofertas em Destaque' 
+                        : (selectedCategory || 'Todas as Ofertas do Dia')}
                     </h2>
                   </div>
                   <span className="text-xs font-semibold text-slate-500 tabular-nums">

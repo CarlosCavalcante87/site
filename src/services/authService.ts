@@ -191,11 +191,27 @@ export async function updateFirebaseAdminPassword(
 
 /**
  * Sends a password reset email via Firebase Auth.
- * Strictly configured so password recovery is exclusively delivered to the system owner: 87informatica@gmail.com
+ * Normalizes input, ensures user account exists to avoid silent drops due to email enumeration protection, and dispatches the reset link.
  */
 export async function sendFirebasePasswordReset(emailOrUser?: string): Promise<string> {
-  const targetEmail = OWNER_RECOVERY_EMAIL;
+  const targetEmail = (emailOrUser && emailOrUser.trim())
+    ? normalizeAdminEmail(emailOrUser.trim())
+    : OWNER_RECOVERY_EMAIL;
+
   try {
+    // 1. Ensure user account is provisioned in Firebase Auth so reset email is dispatched
+    try {
+      const currentPass = getAdminPassword().trim() || 'admin123';
+      await createUserWithEmailAndPassword(auth, targetEmail, currentPass);
+    } catch (provisionErr: unknown) {
+      const code = (provisionErr as { code?: string })?.code;
+      // If user already exists (auth/email-already-in-use), this is expected
+      if (code !== 'auth/email-already-in-use') {
+        console.warn('Notice during user provision before reset:', provisionErr);
+      }
+    }
+
+    // 2. Dispatch password reset email via Firebase Auth
     await sendPasswordResetEmail(auth, targetEmail);
     return targetEmail;
   } catch (err: unknown) {

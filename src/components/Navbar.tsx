@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleOpenWhatsApp = () => {
     const phone = config.whatsappNumber || '5511999999999';
     const cleanPhone = phone.replace(/\D/g, '');
-    const message = config.whatsappDefaultMessage || 'Olá! Gostaria de tirar dúvidas sobre as promoções do Achados do Dia.';
+    const message = config.whatsappDefaultMessage || 'Olá! Gostaria de tirar dúvidas sobre as promoções do Ofertas do Dia.';
     const encoded = encodeURIComponent(message);
     const url = `https://wa.me/${cleanPhone}?text=${encoded}`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -52,10 +52,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Flame className="w-5 h-5 fill-current" />
           </div>
           <span className="text-base sm:text-xl font-extrabold tracking-tight text-white drop-shadow-xs truncate font-display">
-            Achados do Dia
+            Ofertas do Dia
           </span>
           <span className="hidden sm:inline-flex text-[11px] font-bold text-orange-100 bg-white/20 backdrop-blur-xs border border-white/25 px-2.5 py-0.5 rounded-full ml-1 tabular-nums shrink-0">
-            {totalProductsCount} achados
+            {totalProductsCount} ofertas
           </span>
         </button>
 

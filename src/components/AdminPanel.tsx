@@ -285,13 +285,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [pendingFirebaseUser, setPendingFirebaseUser] = useState<FirebaseUser | null>(null);
   const [twoFactorActive, setTwoFactorActive] = useState<boolean>(() => is2FAEnabled());
 
-  // Password Recovery via Admin Email (Restricted exclusively to system owner: 87informatica@gmail.com)
+  // Password Recovery via Admin Email
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState(OWNER_RECOVERY_EMAIL);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [showInitialHelp, setShowInitialHelp] = useState(false);
+
+  // Emergency PIN Recovery State
+  const [showPinRecovery, setShowPinRecovery] = useState(true);
+  const [pinRecoveryCode, setPinRecoveryCode] = useState('');
+  const [showPinRecoveryCode, setShowPinRecoveryCode] = useState(false);
+  const [showPinRecoveryPass, setShowPinRecoveryPass] = useState(false);
+  const [pinRecoveryNewPass, setPinRecoveryNewPass] = useState('');
+  const [pinRecoveryConfirmPass, setPinRecoveryConfirmPass] = useState('');
+  const [pinRecoveryError, setPinRecoveryError] = useState<string | null>(null);
+  const [pinRecoverySuccess, setPinRecoverySuccess] = useState<string | null>(null);
+  const [pinRecoveryLoading, setPinRecoveryLoading] = useState(false);
 
   // Security Tab Settings State: Master PIN
   const [masterPinCurrent, setMasterPinCurrent] = useState('');
@@ -644,26 +655,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       isInitialSetupCompleted: false,
     });
     setMustCompleteInitialSetup(true);
-    addSecurityLog('CONFIG_CHANGED', 'Credenciais administrativas restauradas para os padrões de fábrica (admin / admin123 / PIN 878787).', 'info');
+    addSecurityLog('CONFIG_CHANGED', 'Credenciais administrativas restauradas para os padrões de fábrica.', 'info');
     setSecurityLogs(getSecurityLogs());
-    onShowToast('Credenciais restauradas de fábrica! Usuário: admin | Senha: admin123 | PIN: 878787');
+    onShowToast('Credenciais restauradas com sucesso para o padrão de fábrica!');
   };
 
-  // Official Password Recovery via Email (Strictly restricted to system owner: 87informatica@gmail.com)
+  // Official Password Recovery via Email
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError(null);
     setForgotSuccess(null);
     setForgotLoading(true);
 
+    const targetEmail = forgotEmail.trim() || OWNER_RECOVERY_EMAIL;
+
     try {
-      // The recovery link is exclusively delivered to the system owner
-      const targetEmail = OWNER_RECOVERY_EMAIL;
       await sendFirebasePasswordReset(targetEmail);
       setForgotSuccess(
-        `Link de redefinição enviado com sucesso para ${targetEmail} (proprietário do sistema)! Verifique sua caixa de entrada e spam.`
+        `Link de redefinição enviado com sucesso para ${targetEmail}! Verifique sua Caixa de Entrada e também a pasta de Lixo Eletrônico / Spam.`
       );
-      addSecurityLog('CONFIG_CHANGED', `Solicitação de redefinição de senha enviada para o proprietário (${targetEmail}).`, 'info');
+      addSecurityLog('CONFIG_CHANGED', `Solicitação de redefinição de senha enviada para (${targetEmail}).`, 'info');
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       setForgotError(
@@ -672,6 +683,88 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       );
     } finally {
       setForgotLoading(false);
+    }
+  };
+
+  // Emergency Instant Password Reset via Master PIN
+  const handleEmergencyPinReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinRecoveryError(null);
+    setPinRecoverySuccess(null);
+    setPinRecoveryLoading(true);
+
+    try {
+      const trimmedPin = pinRecoveryCode.trim();
+      if (!trimmedPin || !verifyMasterPin(trimmedPin)) {
+        setPinRecoveryError('PIN Master incorreto. Digite o PIN secreto de 6 dígitos.');
+        setPinRecoveryLoading(false);
+        return;
+      }
+
+      if (pinRecoveryNewPass.length < 6) {
+        setPinRecoveryError('A nova senha deve ter no mínimo 6 caracteres.');
+        setPinRecoveryLoading(false);
+        return;
+      }
+
+      if (pinRecoveryNewPass !== pinRecoveryConfirmPass) {
+        setPinRecoveryError('A confirmação da nova senha não coincide com a nova senha digitada.');
+        setPinRecoveryLoading(false);
+        return;
+      }
+
+      const currentConfiguredUser = getAdminUsername();
+      const targetUser = loginUser.trim() || currentConfiguredUser || 'admin';
+      const targetEmail = forgotEmail.trim() || OWNER_RECOVERY_EMAIL;
+
+      // 1. Reset any lockout and clear attempts
+      resetLockout();
+      setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
+
+      // 2. Update in local storage
+      setAdminPassword(pinRecoveryNewPass);
+      setAdminUsername(targetUser);
+
+      // 3. Update in Firestore Cloud
+      try {
+        await saveAdminAuthToCloud({
+          username: targetUser,
+          password: pinRecoveryNewPass,
+          isInitialSetupCompleted: true
+        });
+      } catch (cloudErr) {
+        console.warn('Notice saving adminAuth to Firestore:', cloudErr);
+      }
+
+      // 4. Update in Firebase Auth
+      try {
+        await updateFirebaseAdminPassword(pinRecoveryNewPass, undefined, targetEmail);
+      } catch (authErr) {
+        console.warn('Firebase Auth password sync notice:', authErr);
+      }
+
+      addSecurityLog('PASSWORD_CHANGED', `Senha redefinida com sucesso via PIN Master para "${targetUser}".`, 'info');
+      setPinRecoverySuccess('Senha redefinida com sucesso! Acessando o painel...');
+      setLoginUser(targetUser);
+      setLoginPassword(pinRecoveryNewPass);
+      onShowToast('Senha redefinida com sucesso via PIN Master!');
+
+      // Automatically log the administrator in
+      setTimeout(() => {
+        setAdminSession(true);
+        setIsAdminLoggedIn(true);
+        setShowForgotModal(false);
+        setShowPinRecovery(false);
+        setPinRecoveryCode('');
+        setPinRecoveryNewPass('');
+        setPinRecoveryConfirmPass('');
+        onShowToast(`Acesso liberado! Bem-vindo(a), ${targetUser}!`);
+      }, 700);
+    } catch (err: unknown) {
+      console.error('Error during emergency PIN reset:', err);
+      setPinRecoveryError('Erro ao redefinir senha. Tente novamente.');
+    } finally {
+      setPinRecoveryLoading(false);
     }
   };
 
@@ -863,7 +956,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return;
       }
       if (trimmedPin === '878787') {
-        setSetupError('O novo PIN Master não pode ser o de fábrica "878787". Escolha um PIN exclusivo de 6 dígitos.');
+        setSetupError('O novo PIN Master não pode ser o padrão inicial de fábrica. Escolha um PIN exclusivo de 6 dígitos.');
         return;
       }
       if (trimmedPin !== trimmedPinConfirm) {
@@ -1464,24 +1557,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
           ) : showForgotModal ? (
-            /* PASSWORD RECOVERY VIA OFFICIAL FIREBASE AUTH EMAIL (OWNER ONLY) */
+            /* PASSWORD RECOVERY VIA FIREBASE AUTH EMAIL OR EMERGENCY PIN MASTER */
             <div className="space-y-4 mb-6">
               <div className="text-center p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                 <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center mx-auto mb-2">
                   <ShieldCheck className="w-5 h-5 text-amber-400" />
                 </div>
                 <h3 className="text-xs font-bold text-slate-900">
-                  Recuperação Exclusiva do Proprietário
+                  Recuperação de Acesso do Administrador
                 </h3>
                 <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                  Por motivos de segurança, o link temporário de redefinição de acesso é enviado <strong>exclusivamente para o e-mail do proprietário</strong> do sistema.
+                  Redefina sua senha imediatamente usando seu <strong>PIN Master secreto</strong> ou solicite o envio de link por e-mail.
                 </p>
               </div>
 
               {forgotSuccess && (
                 <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>{forgotSuccess}</span>
+                  <div>
+                    <span className="font-bold block mb-1">E-mail enviado!</span>
+                    <span>{forgotSuccess}</span>
+                    <p className="text-[10px] text-emerald-700 mt-2 font-medium">
+                      💡 <strong>Dica importante:</strong> Verifique tanto a Caixa de Entrada quanto as pastas de <em>Spam / Lixo Eletrônico</em> e <em>Promoções</em>.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1492,41 +1591,186 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               )}
 
-              {!forgotSuccess && (
-                <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                        E-mail do Proprietário
-                      </label>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Shield className="w-3 h-3 text-emerald-600" />
-                        Oficial
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="email"
-                        readOnly
-                        value={OWNER_RECOVERY_EMAIL}
-                        className="w-full px-4 py-2.5 bg-slate-100/90 rounded-xl border border-slate-300 text-xs text-slate-900 font-semibold cursor-not-allowed select-all"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Destinatário único autorizado para proteção de acesso.
-                    </p>
+              {/* 1. Email Recovery Form */}
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                      E-mail do Administrador *
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-emerald-600" />
+                      Firebase Auth
+                    </span>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:shadow-lg"
-                  >
-                    <Send className="w-4 h-4 text-amber-400" />
-                    <span>{forgotLoading ? 'Enviando link seguro...' : 'Enviar Link para 87informatica@gmail.com'}</span>
-                  </button>
-                </form>
-              )}
+                  <div className="relative">
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="ex: 87informatica@gmail.com"
+                      className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-300 text-xs text-slate-900 font-medium focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  {/* Quick Email Selection Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span className="text-[10px] text-slate-400 font-medium">Contas autorizadas:</span>
+                    {AUTHORIZED_ADMIN_EMAILS.map((adminEmail) => (
+                      <button
+                        type="button"
+                        key={adminEmail}
+                        onClick={() => setForgotEmail(adminEmail)}
+                        className={`text-[10px] px-2 py-0.5 rounded-lg border font-mono transition-colors cursor-pointer ${
+                          forgotEmail.toLowerCase() === adminEmail.toLowerCase()
+                            ? 'bg-amber-100 border-amber-300 text-amber-900 font-bold'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {adminEmail}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading || !forgotEmail.trim()}
+                  className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs hover:shadow-md"
+                >
+                  <Send className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{forgotLoading ? 'Enviando link seguro...' : `Enviar Link para ${forgotEmail.trim() || 'e-mail'}`}</span>
+                </button>
+              </form>
+
+              {/* 2. Emergency Master PIN Instant Reset Drawer */}
+              <div className="border border-amber-200/80 bg-amber-50/50 rounded-2xl p-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPinRecovery(!showPinRecovery)}
+                  className="w-full flex items-center justify-between text-left cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold shrink-0">
+                      <KeyRound className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                        Precisa de acesso imediato sem esperar o e-mail?
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        Redefinir senha instantaneamente via PIN Master secreto
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-amber-700 ml-2">
+                    {showPinRecovery ? '▲ Fechar' : '▼ Abrir'}
+                  </span>
+                </button>
+
+                {showPinRecovery && (
+                  <form onSubmit={handleEmergencyPinReset} className="mt-4 pt-3 border-t border-amber-200/60 space-y-3">
+                    {pinRecoverySuccess && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{pinRecoverySuccess}</span>
+                      </div>
+                    )}
+
+                    {pinRecoveryError && (
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>{pinRecoveryError}</span>
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          PIN Master de Segurança (6 dígitos) *
+                        </label>
+                        <span className="text-[10px] text-amber-700 font-medium">
+                          Padrão de fábrica: 6 dígitos
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showPinRecoveryCode ? 'text' : 'password'}
+                          required
+                          maxLength={6}
+                          value={pinRecoveryCode}
+                          onChange={(e) => setPinRecoveryCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="••••••"
+                          className="w-full text-center tracking-[0.5em] font-mono font-bold px-3 py-2.5 bg-white rounded-xl border border-amber-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPinRecoveryCode(!showPinRecoveryCode)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                          title={showPinRecoveryCode ? 'Ocultar PIN' : 'Ver PIN'}
+                        >
+                          {showPinRecoveryCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          Nova Senha *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPinRecoveryPass ? 'text' : 'password'}
+                            required
+                            minLength={6}
+                            value={pinRecoveryNewPass}
+                            onChange={(e) => setPinRecoveryNewPass(e.target.value)}
+                            placeholder="Mínimo 6 caracteres"
+                            className="w-full px-3 py-2 pr-9 bg-white rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPinRecoveryPass(!showPinRecoveryPass)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                            title={showPinRecoveryPass ? 'Ocultar' : 'Ver'}
+                          >
+                            {showPinRecoveryPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          Confirmar Nova Senha *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPinRecoveryPass ? 'text' : 'password'}
+                            required
+                            minLength={6}
+                            value={pinRecoveryConfirmPass}
+                            onChange={(e) => setPinRecoveryConfirmPass(e.target.value)}
+                            placeholder="Repita a nova senha"
+                            className="w-full px-3 py-2 pr-9 bg-white rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={pinRecoveryLoading || pinRecoveryCode.length < 6 || pinRecoveryNewPass.length < 6}
+                      className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-98 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{pinRecoveryLoading ? 'Salvando nova senha...' : 'Redefinir Senha Imediatamente'}</span>
+                    </button>
+                  </form>
+                )}
+              </div>
 
               <div className="text-center pt-2">
                 <button
@@ -1535,6 +1779,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     setShowForgotModal(false);
                     setForgotError(null);
                     setForgotSuccess(null);
+                    setShowPinRecovery(false);
                   }}
                   className="text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer transition-colors"
                 >
@@ -1618,12 +1863,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       type="button"
                       onClick={() => {
                         setForgotEmail(OWNER_RECOVERY_EMAIL);
+                        setShowPinRecovery(true);
                         setShowForgotModal(true);
                       }}
-                      className="text-[11px] font-medium text-slate-500 hover:text-amber-600 flex items-center gap-1 transition-colors cursor-pointer"
+                      className="text-[11px] font-medium text-slate-500 hover:text-amber-600 flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <Mail className="w-3 h-3" />
-                      <span>Esqueceu a senha? Recuperar por e-mail</span>
+                      <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Esqueceu a senha? Recuperar pelo PIN</span>
                     </button>
                   </div>
                 </div>
@@ -1737,7 +1983,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
 
                 <p className="text-[11px] text-slate-500 text-center">
-                  PIN padrão de fábrica: <strong className="font-mono text-slate-700">878787</strong> (pode ser alterado ou desativado na aba Segurança).
+                  Digite seu PIN secreto de 6 dígitos para autenticação de dois fatores.
                 </p>
 
                 <div className="text-center pt-1">
@@ -1767,12 +2013,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
 
             {showInitialHelp && (
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mt-2.5 text-center transition-all animate-fadeIn">
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Primeiro acesso de fábrica? Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
-                </p>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  PIN Master de fábrica: <strong className="text-slate-800 font-mono">878787</strong> (obrigatório alterar após primeiro login).
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mt-2.5 text-center transition-all animate-fadeIn space-y-2">
+                <div>
+                  <p className="text-xs font-bold text-slate-800">
+                    Primeiro acesso de fábrica?
+                  </p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Usuário inicial: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
+                  </p>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
+                  O PIN Master secreto foi enviado de forma<br />
+                  privada ao proprietário da loja.
                 </p>
               </div>
             )}
@@ -1885,7 +2137,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 3. Novo PIN Master (6 Dígitos Numéricos) *
               </label>
               <p className="text-[11px] text-slate-500 mb-2">
-                Substitui o padrão inicial <strong className="font-mono text-slate-700">878787</strong>. Digite 6 números.
+                Defina um código secreto exclusivo de 6 números para proteção da sua conta.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -1991,40 +2243,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
 
-        {/* Quick Action Buttons on Mobile & Desktop */}
-        <div className="flex flex-wrap items-center gap-2 pt-3">
+        {/* All Action and Navigation Buttons in One Single Row */}
+        <div className="flex items-center gap-2 overflow-x-auto pt-3 border-t border-slate-100 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
           <button
             onClick={() => {
               resetForm();
               setActiveTab('new-product');
             }}
-            className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer shadow-sm shadow-orange-500/25 hover:shadow-lg hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 hover:ring-2 hover:ring-orange-400/50"
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+              activeTab === 'new-product' && !editingProductId
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/30'
+                : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-600 hover:text-white hover:border-orange-600 shadow-xs'
+            }`}
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar Novo Produto</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('security')}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
-              activeTab === 'security'
-                ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-xs hover:bg-amber-600 hover:text-white'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 hover:shadow-xs'
-            }`}
-            title="Alterar senha do administrador"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-            <span>Senha</span>
-          </button>
-        </div>
-
-        {/* Tab Navigation with Mobile Touch Scroll and Pill Styling */}
-        <div className="flex items-center gap-1.5 overflow-x-auto mt-4 pt-3 border-t border-slate-100 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
-          <button
             onClick={() => setActiveTab('products')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'products'
-                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25'
                 : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
@@ -2035,9 +2275,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {editingProductId && (
             <button
               onClick={() => setActiveTab('new-product')}
-              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+              className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
                 activeTab === 'new-product'
-                  ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                  ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25'
                   : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
               }`}
             >
@@ -2048,9 +2288,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('banners')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'banners'
-                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25'
                 : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
@@ -2060,9 +2300,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('categories')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'categories'
-                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25'
                 : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
@@ -2072,9 +2312,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('stats')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'stats'
-                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25'
                 : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
@@ -2084,26 +2324,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
-              activeTab === 'security'
-                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+              activeTab === 'security' || activeTab === 'backup'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25'
                 : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
             }`}
           >
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>Segurança</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('backup')}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
-              activeTab === 'backup'
-                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-700'
-                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
-            }`}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Backup</span>
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Segurança & Backup</span>
           </button>
         </div>
       </div>
@@ -2554,7 +2782,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   rows={3}
                   value={siteConfig.whatsappDefaultMessage}
                   onChange={(e) => setSiteConfig({ ...siteConfig, whatsappDefaultMessage: e.target.value })}
-                  placeholder="Olá! Estava navegando no Achados do Dia e gostaria de tirar algumas dúvidas..."
+                  placeholder="Olá! Estava navegando no Ofertas do Dia e gostaria de tirar algumas dúvidas..."
                   className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
                 />
               </div>
@@ -3733,8 +3961,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 5: Security & Credentials Modification */}
-      {activeTab === 'security' && (
+      {/* TAB: Segurança & Backup */}
+      {(activeTab === 'security' || activeTab === 'backup') && (
         <>
           {/* Card 1: Alteração de Nome de Usuário */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto mb-6">
@@ -3800,7 +4028,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                Segurança e Alteração de Senha
+                Segurança
               </h2>
               <p className="text-xs text-slate-500">
                 Altere a senha de acesso ao Painel Administrativo. A nova senha é salva no Firestore e sincronizada permanentemente.
@@ -4000,7 +4228,71 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </form>
         </div>
 
-        {/* Card 3: Anti-Brute-Force & Session Protection Status */}
+          {/* Card 3: Gerenciamento e Backup de Dados */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto mt-6">
+            <div className="flex items-center gap-3 pb-6 mb-6 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-xs">
+                <Download className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Gerenciamento e Backup de Dados
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Exporte cópias de segurança em JSON, restaure catálogos ou resete para os dados de demonstração.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-xs text-slate-900">Exportar Catálogo em JSON</h4>
+                  <p className="text-[11px] text-slate-500">Baixe uma cópia completa com todos os produtos</p>
+                </div>
+                <button
+                  onClick={handleExport}
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar Backup</span>
+                </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-xs text-slate-900">Importar Arquivo JSON</h4>
+                  <p className="text-[11px] text-slate-500">Substitua o catálogo por um arquivo de backup salvo</p>
+                </div>
+                <label className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Carregar Arquivo</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImport}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-xs text-rose-900">Restaurar Catálogo de Demonstração</h4>
+                  <p className="text-[11px] text-rose-600">Volta para os achadinhos iniciais pré-configurados</p>
+                </div>
+                <button
+                  onClick={handleResetDefaults}
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restaurar Fábrica</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Anti-Brute-Force & Session Protection Status */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto mt-6">
           <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-100">
             <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-bold shadow-xs">
@@ -4140,66 +4432,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           )}
         </div>
         </>
-      )}
-
-      {/* TAB 6: Backup & Restore */}
-      {activeTab === 'backup' && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto">
-          <h3 className="text-base font-bold text-slate-900 mb-2">
-            Gerenciamento e Backup de Dados
-          </h3>
-          <p className="text-xs text-slate-500 mb-6">
-            Todos os produtos, 3 banners e categorias cadastrados ficam salvos no armazenamento local do navegador.
-            Você pode exportar um arquivo JSON de backup ou restaurar quando quiser.
-          </p>
-
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="font-bold text-xs text-slate-900">Exportar Catálogo em JSON</h4>
-                <p className="text-[11px] text-slate-500">Baixe uma cópia completa com todos os produtos</p>
-              </div>
-              <button
-                onClick={handleExport}
-                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Exportar Backup</span>
-              </button>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="font-bold text-xs text-slate-900">Importar Arquivo JSON</h4>
-                <p className="text-[11px] text-slate-500">Substitua o catálogo por um arquivo de backup salvo</p>
-              </div>
-              <label className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                <Upload className="w-3.5 h-3.5" />
-                <span>Carregar Arquivo</span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImport}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="font-bold text-xs text-rose-900">Restaurar Catálogo de Demonstração</h4>
-                <p className="text-[11px] text-rose-600">Volta para os achadinhos iniciais pré-configurados</p>
-              </div>
-              <button
-                onClick={handleResetDefaults}
-                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Restaurar Fábrica</span>
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Delete Product Confirmation Modal */}

@@ -9,6 +9,7 @@ interface BannerSliderProps {
 
 export const BannerSlider: React.FC<BannerSliderProps> = ({
   banners,
+  onSelectCategory,
 }) => {
   const activeBanners = banners.filter((b) => b.isActive);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -37,12 +38,33 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
   if (activeBanners.length === 0) return null;
 
   const currentBanner = activeBanners[currentIndex] || activeBanners[0];
+  const isClickable = Boolean(currentBanner.tagCategory || (currentBanner.linkUrl && currentBanner.linkUrl !== '#'));
 
-  const handleNext = () => {
+  const handleBannerClick = () => {
+    if (currentBanner.tagCategory && onSelectCategory) {
+      onSelectCategory(currentBanner.tagCategory);
+      return;
+    }
+    if (currentBanner.linkUrl) {
+      if (currentBanner.linkUrl.startsWith('http')) {
+        window.open(currentBanner.linkUrl, '_blank', 'noopener,noreferrer');
+      } else if (currentBanner.linkUrl.startsWith('#')) {
+        const id = currentBanner.linkUrl.replace('#', '');
+        const el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    }
+  };
+
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setCurrentIndex((prev) => (prev + 1) % activeBanners.length);
   };
 
-  const handlePrev = () => {
+  const handlePrev = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setCurrentIndex((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
   };
 
@@ -70,9 +92,12 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
 
   return (
     <section className="max-w-7xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-2">
-      {/* Banner puro sem textos e sem links */}
+      {/* Banner puro sem textos e com suporte a clique e swipe */}
       <div 
-        className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-sm group h-[140px] xs:h-[170px] sm:h-[220px] md:h-[270px] lg:h-[300px] border border-slate-200/80 select-none"
+        onClick={handleBannerClick}
+        className={`relative overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-sm group h-[140px] xs:h-[170px] sm:h-[220px] md:h-[270px] lg:h-[300px] border border-slate-200/80 select-none ${
+          isClickable ? 'cursor-pointer' : ''
+        }`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onTouchStart={onTouchStart}
@@ -86,6 +111,10 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
             alt={currentBanner.title || 'Banner promocional'}
             className="w-full h-full object-cover object-center transition-all duration-700"
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              const target = e.currentTarget;
+              target.src = '/og-image.jpg';
+            }}
           />
         </div>
 
@@ -115,7 +144,10 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
             {activeBanners.map((_, idx) => (
               <button
                 key={idx}
-                onClick={() => setCurrentIndex(idx)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentIndex(idx);
+                }}
                 className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 cursor-pointer ${
                   idx === currentIndex
                     ? 'w-5 sm:w-6 bg-orange-500'

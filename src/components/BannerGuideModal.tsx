@@ -30,7 +30,7 @@ export const BannerGuideModal: React.FC<BannerGuideModalProps> = ({ isOpen, onCl
               Guia de Formatos e Dimensões dos Banners
             </h2>
             <p className="text-xs text-slate-500">
-              Orientações completas para criar e usar banners atraentes no Achados do Dia.
+              Orientações completas para criar e usar banners atraentes no Ofertas do Dia.
             </p>
           </div>
         </div>

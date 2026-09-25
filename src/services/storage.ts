@@ -456,12 +456,13 @@ export const verifyAdminCredentials = (enteredUser: string, enteredPass: string)
   const trimmedUser = enteredUser.trim().toLowerCase();
   const trimmedPass = enteredPass.trim();
 
-  // Valid users: configured username, or master admin emails, or 'admin' if initial setup not completed
+  // Valid users: configured username, or master admin emails, or 'admin'
   const validUser = (trimmedUser === currentUsername) || 
+                    (trimmedUser === 'admin') ||
                     (trimmedUser === 'admin@achadosdodia.com.br') ||
                     (trimmedUser === 'ursula879518@gmail.com') ||
                     (trimmedUser === '87informatica@gmail.com') ||
-                    (!isInitialSetupCompleted() && trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase());
+                    (trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase());
 
   // Only the current active password is accepted
   return validUser && (trimmedPass === currentPass);

@@ -40,7 +40,7 @@ export const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
   }, []);
 
   const phone = customNumber || config.whatsappNumber || '5511999999999';
-  const message = customMessage || config.whatsappDefaultMessage || 'Olá! Gostaria de tirar algumas dúvidas sobre as ofertas e achadinhos do Achados do Dia.';
+  const message = customMessage || config.whatsappDefaultMessage || 'Olá! Gostaria de tirar algumas dúvidas sobre as ofertas e promoções do Ofertas do Dia.';
 
   const handleOpenWhatsApp = () => {
     // Clean phone number: remove non-digits

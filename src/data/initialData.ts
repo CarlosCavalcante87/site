@@ -54,7 +54,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     affiliateUrl: 'https://shopee.com.br',
     category: 'Organizadores',
     images: [
-      '/src/assets/images/organizador_acrilico_giratorio_1790120510574.jpg',
+      '/images/organizador_acrilico_giratorio_1790120510574.jpg',
       'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80'
     ],
@@ -89,7 +89,7 @@ Fácil de montar, desmontar e lavar em água corrente com sabão neutro. Economi
     affiliateUrl: 'https://amazon.com.br',
     category: 'Cozinha & Casa',
     images: [
-      '/src/assets/images/mini_processador_portatil_1790120527360.jpg',
+      '/images/mini_processador_portatil_1790120527360.jpg',
       'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=80'
     ],
     description: `Diga adeus ao cheiro de alho e cebola grudado nas mãos e ao cansaço de picar condimentos na tábua. O Mini Processador Elétrico Portátil conta com motor potente de alto torque e lâminas triplas de aço inoxidável 304 com afiação cirúrgica.
@@ -123,7 +123,7 @@ Possui bateria interna de lítio com recarga rápida via USB Type-C que dura mai
     affiliateUrl: 'https://mercadolivre.com.br',
     category: 'Casa & Conforto',
     images: [
-      '/src/assets/images/umidificador_chama_led_1790120545471.jpg',
+      '/images/umidificador_chama_led_1790120545471.jpg',
       'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80'
     ],
     description: `O Umidificador Ultrassônico Efeito Chama une aromaterapia terapêutica e sofisticação decorativa. Através de tecnologia de névoa fria ultrassônica combinada com iluminação LED inteligente âmbar, ele simula com perfeição as chamas dançantes de uma aconchegante lareira sem produzir calor nem fogo.
@@ -157,7 +157,7 @@ Conta com sensor de segurança com desligamento automático quando a água ating
     affiliateUrl: 'https://aliexpress.com',
     category: 'Tecnologia & Gadgets',
     images: [
-      '/src/assets/images/luminaria_inducao_minimalista_1790120556704.jpg',
+      '/images/luminaria_inducao_minimalista_1790120556704.jpg',
       'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=800&q=80'
     ],
     description: `Modernize seu espaço de trabalho ou cabeceira com a luminária LED de design escandinavo minimalista. Equipada com uma base com placa de indução Qi de 15W, ela recarrega seu smartphone compatível simplesmente repousando o aparelho sobre a base, eliminando o emaranhado de fios na mesa.
@@ -191,7 +191,7 @@ Controle por sensor tátil intuitivo que alterna entre 3 temperaturas de cor (Br
     affiliateUrl: 'https://shopee.com.br',
     category: 'Banheiro & Cuidados',
     images: [
-      '/src/assets/images/dispenser_sensor_espuma_1790120594683.jpg',
+      '/images/dispenser_sensor_espuma_1790120594683.jpg',
       'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=800&q=80'
     ],
     description: `Eleve o padrão de higiene e modernidade do seu banheiro ou pia da cozinha. O dispenser automático inteligente dispensa sabonete em uma nuvem cremosa e aveludada de espuma sem que você precise encostar um único dedo no aparelho.
@@ -225,7 +225,7 @@ Com bateria interna recarregável com autonomia de até 90 dias com uso familiar
     affiliateUrl: 'https://mercadolivre.com.br',
     category: 'Cozinha & Casa',
     images: [
-      '/src/assets/images/kit_potes_hermeticos_1790120605012.jpg',
+      '/images/kit_potes_hermeticos_1790120605012.jpg',
       'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80'
     ],
     description: `Transforme seus armários e gavetas de mantimentos com o conjunto de potes herméticos em vidro borossilicato de alta resistência e tampas ecológicas em bambu maciço antibacteriano.
@@ -327,7 +327,7 @@ export const INITIAL_BANNERS = [
     title: 'Top Achadinhos Virais do Momento',
     subtitle: 'Itens que explodiram nas redes sociais selecionados com links oficiais e cupons testados.',
     badge: '🔥 Mais Vendidos',
-    imageUrl: '/src/assets/images/banner_achadinhos_virais_1790121462152.jpg',
+    imageUrl: '/images/banner_achadinhos_virais_1790121462152.jpg',
     linkUrl: '#produtos',
     buttonText: 'Explorar Ofertas',
     tagCategory: 'Utilidades Incríveis',
@@ -338,7 +338,7 @@ export const INITIAL_BANNERS = [
     title: 'Organização Prática para Sua Casa',
     subtitle: 'Soluções inteligentes em acrílico, bambu e organizadores que transformam qualquer cômodo.',
     badge: '✨ Casa & Decor',
-    imageUrl: '/src/assets/images/banner_organizacao_casa_1790121471097.jpg',
+    imageUrl: '/images/banner_organizacao_casa_1790121471097.jpg',
     linkUrl: '#produtos',
     buttonText: 'Ver Organizadores',
     tagCategory: 'Organizadores',
@@ -349,7 +349,7 @@ export const INITIAL_BANNERS = [
     title: 'Gadgets & Tecnologia que Valem a Pena',
     subtitle: 'Iluminação inteligente, fones bluetooth e utilidades inovadoras para facilitar o seu dia a dia.',
     badge: '⚡ Tech & Inovação',
-    imageUrl: '/src/assets/images/banner_gadgets_tecnologia_1790121480292.jpg',
+    imageUrl: '/images/banner_gadgets_tecnologia_1790121480292.jpg',
     linkUrl: '#produtos',
     buttonText: 'Conferir Gadgets',
     tagCategory: 'Tecnologia & Gadgets',
@@ -359,7 +359,7 @@ export const INITIAL_BANNERS = [
 
 export const INITIAL_SITE_CONFIG = {
   whatsappNumber: '5511999999999',
-  whatsappDefaultMessage: 'Olá! Estava navegando no Achados do Dia e gostaria de tirar algumas dúvidas sobre as ofertas e achadinhos.',
+  whatsappDefaultMessage: 'Olá! Estava navegando no Ofertas do Dia e gostaria de tirar algumas dúvidas sobre as ofertas e promoções.',
   mobileDoubleColumns: true,
 };
 

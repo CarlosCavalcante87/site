@@ -1,5 +1,5 @@
 /**
- * SEO & Social Metadata Utility for Achados do Dia
+ * SEO & Social Metadata Utility for Ofertas do Dia
  * Compliant with applet-seo skill and social crawlers (WhatsApp, Facebook, Twitter/X, Telegram)
  */
 
@@ -11,8 +11,8 @@ interface SEOOptions {
   type?: string;
 }
 
-const DEFAULT_TITLE = 'Achados do Dia - Melhores Ofertas e Achadinhos da Internet';
-const DEFAULT_DESCRIPTION = 'Agregador de ofertas e achadinhos das melhores lojas online. Encontre os produtos mais virais e recomendados com links diretos para compra.';
+const DEFAULT_TITLE = 'Ofertas do Dia - Melhores Ofertas e Promoções da Internet';
+const DEFAULT_DESCRIPTION = 'Agregador de ofertas e promoções das melhores lojas online. Encontre os produtos mais virais e recomendados com links diretos para compra.';
 const DEFAULT_IMAGE = '/og-image.jpg';
 
 export function setMetaTag(name: string, content: string, isProperty: boolean = false) {
@@ -78,7 +78,7 @@ export function updatePageSEO(options: SEOOptions) {
   setMetaTag('og:title', title, true);
   setMetaTag('og:description', description, true);
   setMetaTag('og:type', options.type || 'website', true);
-  setMetaTag('og:site_name', 'Achados do Dia', true);
+  setMetaTag('og:site_name', 'Ofertas do Dia', true);
   setMetaTag('og:locale', 'pt_BR', true);
 
   if (currentUrl) {
@@ -92,6 +92,15 @@ export function updatePageSEO(options: SEOOptions) {
     setMetaTag('og:image:width', '1200', true);
     setMetaTag('og:image:height', '630', true);
     setMetaTag('og:image:alt', title, true);
+
+    // Legacy / WhatsApp link rel="image_src" fallback
+    let linkImage = document.querySelector('link[rel="image_src"]') as HTMLLinkElement | null;
+    if (!linkImage) {
+      linkImage = document.createElement('link');
+      linkImage.setAttribute('rel', 'image_src');
+      document.head.appendChild(linkImage);
+    }
+    linkImage.setAttribute('href', image);
   }
 
   // 4. Twitter / X Card

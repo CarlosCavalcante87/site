@@ -35,7 +35,7 @@ export const Footer: React.FC<FooterProps> = ({
                 <Flame className="w-5 h-5 fill-current" />
               </div>
               <span className="font-extrabold text-slate-900 text-lg font-display group-hover:text-orange-600 transition-colors">
-                Achados do Dia
+                Ofertas do Dia
               </span>
             </button>
             <ul className="space-y-2 mb-4 text-xs text-slate-600">
@@ -73,7 +73,7 @@ export const Footer: React.FC<FooterProps> = ({
             </div>
 
             <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-600">
-              <span>© {new Date().getFullYear()} Achados do Dia.</span>
+              <span>© {new Date().getFullYear()} Ofertas do Dia.</span>
               <span className="text-slate-300">•</span>
               <button
                 onClick={onOpenAdmin}
