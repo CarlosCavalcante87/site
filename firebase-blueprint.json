@@ -72,6 +72,18 @@
         "lastLogin": { "type": "string" }
       },
       "required": ["uid", "email"]
+    },
+    "adminAuth": {
+      "title": "AdminAuth",
+      "description": "Administrative access credentials and master security configuration",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "masterPin": { "type": "string" },
+        "isInitialSetupCompleted": { "type": "boolean" },
+        "updatedAt": { "type": "number" }
+      }
     }
   },
   "firestore": {
@@ -90,6 +102,10 @@
     "/settings/siteConfig": {
       "schema": "siteConfig",
       "description": "Public site configuration"
+    },
+    "/settings/adminAuth": {
+      "schema": "adminAuth",
+      "description": "Administrator authentication credentials and PIN configuration"
     },
     "/admins/{adminId}": {
       "schema": "admins",

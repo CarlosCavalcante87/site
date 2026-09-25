@@ -7,6 +7,8 @@ const STORAGE_KEYS = {
   CLICKS: 'achados_do_dia_clicks_v1',
   ADMIN_PIN: 'achados_do_dia_admin_pin_v1',
   ADMIN_PASSWORD: 'achados_do_dia_admin_password_v2',
+  ADMIN_USERNAME: 'achados_do_dia_admin_username_v1',
+  ADMIN_SETUP_DONE: 'achados_do_dia_admin_setup_done_v1',
   BANNERS: 'achados_do_dia_banners_v1',
   SITE_CONFIG: 'achados_do_dia_site_config_v1',
 };
@@ -372,6 +374,44 @@ export const importCatalogJSON = (jsonString: string): boolean => {
 export const DEFAULT_ADMIN_CONFIG = {
   username: 'admin',
   defaultPassword: 'admin123',
+  defaultMasterPin: '878787',
+};
+
+export const getAdminUsername = (): string => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_USERNAME);
+    return saved && saved.trim() ? saved.trim() : DEFAULT_ADMIN_CONFIG.username;
+  } catch {
+    return DEFAULT_ADMIN_CONFIG.username;
+  }
+};
+
+export const setAdminUsername = (newUsername: string): boolean => {
+  try {
+    const trimmed = newUsername.trim();
+    if (!trimmed) return false;
+    localStorage.setItem(STORAGE_KEYS.ADMIN_USERNAME, trimmed);
+    return true;
+  } catch (error) {
+    console.error('Failed to update admin username', error);
+    return false;
+  }
+};
+
+export const isInitialSetupCompleted = (): boolean => {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.ADMIN_SETUP_DONE) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const setInitialSetupCompleted = (completed: boolean): void => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ADMIN_SETUP_DONE, completed ? 'true' : 'false');
+  } catch (err) {
+    console.error('Failed to set setup done state', err);
+  }
 };
 
 export const getAdminPassword = (): string => {
@@ -386,6 +426,7 @@ export const getAdminPassword = (): string => {
 export const setAdminPassword = (newPassword: string): boolean => {
   try {
     const trimmed = newPassword.trim();
+    if (!trimmed) return false;
     localStorage.setItem(STORAGE_KEYS.ADMIN_PASSWORD, trimmed);
     localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, trimmed);
     return true;
@@ -399,8 +440,11 @@ export const resetAdminPasswordToDefault = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEYS.ADMIN_PASSWORD);
     localStorage.removeItem(STORAGE_KEYS.ADMIN_PIN);
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_USERNAME);
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_SETUP_DONE);
     localStorage.setItem(STORAGE_KEYS.ADMIN_PASSWORD, DEFAULT_ADMIN_CONFIG.defaultPassword);
     localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, DEFAULT_ADMIN_CONFIG.defaultPassword);
+    localStorage.setItem(STORAGE_KEYS.ADMIN_USERNAME, DEFAULT_ADMIN_CONFIG.username);
   } catch (err) {
     console.error('Failed to reset admin password', err);
   }
@@ -408,13 +452,18 @@ export const resetAdminPasswordToDefault = (): void => {
 
 export const verifyAdminCredentials = (enteredUser: string, enteredPass: string): boolean => {
   const currentPass = getAdminPassword().trim();
+  const currentUsername = getAdminUsername().trim().toLowerCase();
   const trimmedUser = enteredUser.trim().toLowerCase();
   const trimmedPass = enteredPass.trim();
-  const validUser = (trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase()) || 
+
+  // Valid users: configured username, or master admin emails, or 'admin' if initial setup not completed
+  const validUser = (trimmedUser === currentUsername) || 
                     (trimmedUser === 'admin@achadosdodia.com.br') ||
                     (trimmedUser === 'ursula879518@gmail.com') ||
-                    (trimmedUser === '87informatica@gmail.com');
-  // Only the current active password is accepted (once changed, the old password is fully deactivated)
+                    (trimmedUser === '87informatica@gmail.com') ||
+                    (!isInitialSetupCompleted() && trimmedUser === DEFAULT_ADMIN_CONFIG.username.toLowerCase());
+
+  // Only the current active password is accepted
   return validUser && (trimmedPass === currentPass);
 };
 

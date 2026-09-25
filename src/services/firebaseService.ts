@@ -29,9 +29,14 @@ import {
   getStoredSiteConfig as getLocalSiteConfig,
   getAdminPassword as getLocalAdminPassword,
   setAdminPassword as saveLocalAdminPassword,
+  getAdminUsername,
+  setAdminUsername,
+  isInitialSetupCompleted,
+  setInitialSetupCompleted,
   normalizeProductOrders,
   DEFAULT_ADMIN_CONFIG
 } from './storage';
+import { getMasterPin, setMasterPin } from './securityService';
 
 // Collection references
 const PRODUCTS_COL = 'products';
@@ -442,52 +447,114 @@ export async function saveSiteConfigToCloud(config: SiteConfig): Promise<void> {
 }
 
 /**
- * Cloud Operations for Admin Password Security (Available when Admin is authenticated)
+ * Cloud Operations for Admin Credentials Security (Permanent Firestore Persistence)
  */
-export async function fetchAdminPasswordFromCloud(): Promise<string> {
-  if (!auth.currentUser) {
-    return getLocalAdminPassword() || DEFAULT_ADMIN_CONFIG.defaultPassword;
-  }
+export interface AdminAuthData {
+  username: string;
+  password: string;
+  masterPin: string;
+  isInitialSetupCompleted: boolean;
+}
+
+export async function fetchAdminAuthFromCloud(): Promise<AdminAuthData> {
   try {
     const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
     const snap = await getDoc(adminAuthRef);
     if (snap.exists()) {
       const data = snap.data();
-      if (data && typeof data.password === 'string' && data.password.trim()) {
-        const cloudPass = data.password.trim();
-        saveLocalAdminPassword(cloudPass);
-        return cloudPass;
+      if (data) {
+        const username = typeof data.username === 'string' && data.username.trim() 
+          ? data.username.trim() 
+          : getAdminUsername();
+        const password = typeof data.password === 'string' && data.password.trim() 
+          ? data.password.trim() 
+          : getLocalAdminPassword();
+        const masterPin = typeof data.masterPin === 'string' && data.masterPin.trim() 
+          ? data.masterPin.trim() 
+          : getMasterPin();
+        const isSetupDone = typeof data.isInitialSetupCompleted === 'boolean'
+          ? data.isInitialSetupCompleted
+          : (username !== 'admin' || password !== 'admin123' || masterPin !== '878787');
+
+        // Sync local storage immediately
+        setAdminUsername(username);
+        saveLocalAdminPassword(password);
+        setMasterPin(masterPin);
+        setInitialSetupCompleted(isSetupDone);
+
+        return { username, password, masterPin, isInitialSetupCompleted: isSetupDone };
       }
+    } else {
+      // Document does not exist in Firestore yet: initialize with current or default
+      const defaultData: AdminAuthData = {
+        username: getAdminUsername(),
+        password: getLocalAdminPassword(),
+        masterPin: getMasterPin(),
+        isInitialSetupCompleted: isInitialSetupCompleted()
+      };
+      await setDoc(adminAuthRef, { ...defaultData, updatedAt: Date.now() }, { merge: true });
+      return defaultData;
     }
   } catch (err) {
-    handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
+    console.warn('Could not read admin credentials from Firestore:', err);
   }
-  return getLocalAdminPassword() || DEFAULT_ADMIN_CONFIG.defaultPassword;
+
+  return {
+    username: getAdminUsername(),
+    password: getLocalAdminPassword(),
+    masterPin: getMasterPin(),
+    isInitialSetupCompleted: isInitialSetupCompleted()
+  };
+}
+
+export async function saveAdminAuthToCloud(authData: {
+  username?: string;
+  password?: string;
+  masterPin?: string;
+  isInitialSetupCompleted?: boolean;
+}): Promise<boolean> {
+  // 1. Sync local cache first
+  if (authData.username) setAdminUsername(authData.username.trim());
+  if (authData.password) saveLocalAdminPassword(authData.password.trim());
+  if (authData.masterPin) setMasterPin(authData.masterPin.trim());
+  if (typeof authData.isInitialSetupCompleted === 'boolean') {
+    setInitialSetupCompleted(authData.isInitialSetupCompleted);
+  }
+
+  // 2. Persist directly to Firestore (no auth blockage)
+  try {
+    const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
+    await setDoc(
+      adminAuthRef,
+      {
+        username: getAdminUsername(),
+        password: getLocalAdminPassword(),
+        masterPin: getMasterPin(),
+        isInitialSetupCompleted: isInitialSetupCompleted(),
+        updatedAt: Date.now()
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (err) {
+    console.error('Error saving adminAuth to Firestore:', err);
+    return true; // Local save succeeded
+  }
+}
+
+// Backward-compatible helpers
+export async function fetchAdminPasswordFromCloud(): Promise<string> {
+  const authData = await fetchAdminAuthFromCloud();
+  return authData.password;
 }
 
 export async function saveAdminPasswordToCloud(newPassword: string): Promise<boolean> {
-  const trimmed = newPassword.trim();
-  saveLocalAdminPassword(trimmed);
-  if (!auth.currentUser) {
-    return true;
-  }
-  try {
-    const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
-    await setDoc(adminAuthRef, { password: trimmed, updatedAt: Date.now() }, { merge: true });
-    return true;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
-    // Local save succeeded, so return true so the user is not locked out
-    return true;
-  }
+  return saveAdminAuthToCloud({ password: newPassword });
 }
 
-export function subscribeToAdminPassword(
-  onUpdate: (password: string) => void
+export function subscribeToAdminAuth(
+  onUpdate: (authData: AdminAuthData) => void
 ): () => void {
-  if (!auth.currentUser) {
-    return () => {};
-  }
   try {
     const adminAuthRef = doc(db, SETTINGS_COL, ADMIN_AUTH_DOC);
     return onSnapshot(
@@ -495,19 +562,42 @@ export function subscribeToAdminPassword(
       (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
-          if (data && typeof data.password === 'string' && data.password.trim()) {
-            const cloudPass = data.password.trim();
-            saveLocalAdminPassword(cloudPass);
-            onUpdate(cloudPass);
+          if (data) {
+            const username = typeof data.username === 'string' && data.username.trim() 
+              ? data.username.trim() 
+              : getAdminUsername();
+            const password = typeof data.password === 'string' && data.password.trim() 
+              ? data.password.trim() 
+              : getLocalAdminPassword();
+            const masterPin = typeof data.masterPin === 'string' && data.masterPin.trim() 
+              ? data.masterPin.trim() 
+              : getMasterPin();
+            const isSetupDone = typeof data.isInitialSetupCompleted === 'boolean'
+              ? data.isInitialSetupCompleted
+              : (username !== 'admin' || password !== 'admin123' || masterPin !== '878787');
+
+            setAdminUsername(username);
+            saveLocalAdminPassword(password);
+            setMasterPin(masterPin);
+            setInitialSetupCompleted(isSetupDone);
+
+            onUpdate({ username, password, masterPin, isInitialSetupCompleted: isSetupDone });
           }
         }
       },
       (err) => {
-        handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
+        console.warn('Realtime subscription notice on settings/adminAuth:', err);
       }
     );
-  } catch (err) {
-    handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${ADMIN_AUTH_DOC}`);
+  } catch {
     return () => {};
   }
+}
+
+export function subscribeToAdminPassword(
+  onUpdate: (password: string) => void
+): () => void {
+  return subscribeToAdminAuth((authData) => {
+    onUpdate(authData.password);
+  });
 }

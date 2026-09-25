@@ -24,6 +24,7 @@ import {
   LogOut,
   Mail,
   Send,
+  User,
   UserCheck,
   CheckCircle2,
   AlertCircle,
@@ -163,6 +164,10 @@ import {
   STORE_CONFIG,
   getAdminPassword,
   setAdminPassword,
+  getAdminUsername,
+  setAdminUsername,
+  isInitialSetupCompleted,
+  setInitialSetupCompleted,
   resetAdminPasswordToDefault,
   verifyAdminCredentials,
   getAdminSession,
@@ -184,6 +189,9 @@ import {
   saveCategoriesToCloud,
   deleteCategoryFromCloud,
   saveSiteConfigToCloud,
+  fetchAdminAuthFromCloud,
+  saveAdminAuthToCloud,
+  subscribeToAdminAuth,
   fetchAdminPasswordFromCloud,
   saveAdminPasswordToCloud
 } from '../services/firebaseService';
@@ -285,7 +293,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [showInitialHelp, setShowInitialHelp] = useState(false);
 
-  // Security Tab Settings State
+  // Security Tab Settings State: Master PIN
   const [masterPinCurrent, setMasterPinCurrent] = useState('');
   const [masterPinNew, setMasterPinNew] = useState('');
   const [masterPinConfirm, setMasterPinConfirm] = useState('');
@@ -293,10 +301,59 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [pinChangeSuccess, setPinChangeSuccess] = useState<string | null>(null);
   const [securityLogs, setSecurityLogs] = useState<SecurityLogEntry[]>(() => getSecurityLogs());
 
-  // Clear any residual lockouts on mount so admin is never locked out from login
+  // Security Tab Settings State: Username Change
+  const [currentUsernameDisplay, setCurrentUsernameDisplay] = useState(() => getAdminUsername());
+  const [newUsernameInput, setNewUsernameInput] = useState('');
+  const [usernameChangeError, setUsernameChangeError] = useState<string | null>(null);
+  const [usernameChangeSuccess, setUsernameChangeSuccess] = useState<string | null>(null);
+  const [isChangingUsername, setIsChangingUsername] = useState(false);
+
+  // Mandatory First Access Setup State
+  const [mustCompleteInitialSetup, setMustCompleteInitialSetup] = useState<boolean>(() => {
+    return (
+      !isInitialSetupCompleted() ||
+      getAdminUsername() === 'admin' ||
+      getAdminPassword() === 'admin123' ||
+      getMasterPin() === '878787'
+    );
+  });
+  const [setupUsername, setSetupUsername] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupPasswordConfirm, setSetupPasswordConfirm] = useState('');
+  const [setupPin, setSetupPin] = useState('');
+  const [setupPinConfirm, setSetupPinConfirm] = useState('');
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [setupSubmitting, setSetupSubmitting] = useState(false);
+  const [showSetupPassword, setShowSetupPassword] = useState(false);
+
+  // Synchronize admin credentials from Firestore cloud on mount & realtime
   useEffect(() => {
     resetLockout();
     setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
+
+    fetchAdminAuthFromCloud().then((authData) => {
+      setCurrentUsernameDisplay(authData.username);
+      setLoginUser(authData.username);
+      const isSetupNeeded =
+        !authData.isInitialSetupCompleted ||
+        authData.username === 'admin' ||
+        authData.password === 'admin123' ||
+        authData.masterPin === '878787';
+      setMustCompleteInitialSetup(isSetupNeeded);
+    });
+
+    const unsubscribe = subscribeToAdminAuth((authData) => {
+      setCurrentUsernameDisplay(authData.username);
+      setLoginUser(authData.username);
+      const isSetupNeeded =
+        !authData.isInitialSetupCompleted ||
+        authData.username === 'admin' ||
+        authData.password === 'admin123' ||
+        authData.masterPin === '878787';
+      setMustCompleteInitialSetup(isSetupNeeded);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Live countdown timer for lockout
@@ -428,6 +485,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setLoginStep('credentials');
     setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
     setSecurityLogs(getSecurityLogs());
+
+    // Check if initial setup is mandatory
+    const isSetupNeeded =
+      !isInitialSetupCompleted() ||
+      getAdminUsername() === 'admin' ||
+      getAdminPassword() === 'admin123' ||
+      getMasterPin() === '878787';
+    setMustCompleteInitialSetup(isSetupNeeded);
+
     if (user) {
       await registerAdminInFirestore(user);
     }
@@ -450,6 +516,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsLoggingIn(true);
 
     try {
+      // 1. Ensure latest credentials from cloud are loaded
+      await fetchAdminAuthFromCloud();
       const isValidLocal = verifyAdminCredentials(loginUser, loginPassword);
       let firebaseUser: FirebaseUser | null = null;
 
@@ -463,17 +531,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           setLoginError('Esta conta não tem permissões de administrador.');
           return;
         }
-        // When successfully logged into Firebase Auth with this password, sync local password cache
-        setAdminPassword(loginPassword.trim());
       } catch (authErr: unknown) {
-        const code = (authErr as { code?: string })?.code;
         if (isValidLocal) {
-          // If password matches the local active admin password, allow access and sync Firebase in background
+          // Password is valid locally and in Firestore; attempt background sync with Firebase Auth
           try {
             await updateFirebaseAdminPassword('admin123', loginPassword.trim(), loginUser);
             firebaseUser = await loginWithFirebaseAuth(loginUser, loginPassword.trim());
           } catch {
-            // Local admin access remains valid
+            // Local & Cloud Firestore validation is already verified!
           }
         } else {
           const lockRes = recordFailedAttempt(loginUser);
@@ -562,7 +627,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // One-click Emergency / Direct Password Restore to Default (admin123)
-  const handleRestoreDefaultAccess = () => {
+  const handleRestoreDefaultAccess = async () => {
     resetAdminPasswordToDefault();
     resetLockout();
     set2FAEnabled(false);
@@ -572,9 +637,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setLockout({ isLocked: false, remainingSeconds: 0, failedAttempts: 0 });
     setLoginError(null);
     setLoginStep('credentials');
-    addSecurityLog('CONFIG_CHANGED', 'Senha administrativa restaurada para a padrão (admin123) e bloqueios resetados.', 'info');
+    await saveAdminAuthToCloud({
+      username: 'admin',
+      password: 'admin123',
+      masterPin: '878787',
+      isInitialSetupCompleted: false,
+    });
+    setMustCompleteInitialSetup(true);
+    addSecurityLog('CONFIG_CHANGED', 'Credenciais administrativas restauradas para os padrões de fábrica (admin / admin123 / PIN 878787).', 'info');
     setSecurityLogs(getSecurityLogs());
-    onShowToast('Senha restaurada para admin123! Clique em "Entrar no Painel Admin".');
+    onShowToast('Credenciais restauradas de fábrica! Usuário: admin | Senha: admin123 | PIN: 878787');
   };
 
   // Official Password Recovery via Email (Strictly restricted to system owner: 87informatica@gmail.com)
@@ -655,23 +727,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return;
       }
 
-      // Update in Firebase Auth using re-authentication
+      // Save new password locally immediately (invalidating old passwords)
+      setAdminPassword(trimmedNew);
+
+      // Save to Firestore Cloud permanently
+      await saveAdminPasswordToCloud(trimmedNew);
+
+      // Update in Firebase Auth using re-authentication (best effort)
       try {
         await updateFirebaseAdminPassword(enteredCurrent, trimmedNew, currentAuthUser?.email || ADMIN_PRIMARY_EMAIL);
       } catch (authErr: unknown) {
         console.warn('Notice updating Firebase Auth password:', authErr);
-        const code = (authErr as { code?: string })?.code;
-        if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-          setPasswordChangeError('A senha atual informada não confere com o servidor de autenticação.');
-          return;
-        }
       }
-
-      // Save new password locally immediately (invalidating old passwords)
-      setAdminPassword(trimmedNew);
-
-      // Save to Firestore Cloud
-      await saveAdminPasswordToCloud(trimmedNew);
 
       addSecurityLog('PASSWORD_CHANGED', 'Senha de administrador alterada e sincronizada.', 'info');
       setSecurityLogs(getSecurityLogs());
@@ -688,7 +755,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Handle Master 2FA PIN Change
-  const handlePinChangeSubmit = (e: React.FormEvent) => {
+  const handlePinChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinChangeError(null);
     setPinChangeSuccess(null);
@@ -711,6 +778,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const ok = setMasterPin(trimmedNew);
     if (ok) {
+      await saveAdminAuthToCloud({ masterPin: trimmedNew });
       setPinChangeSuccess('PIN Master de 6 dígitos atualizado com sucesso!');
       setMasterPinCurrent('');
       setMasterPinNew('');
@@ -719,6 +787,121 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       onShowToast('PIN de Segurança Master de 6 dígitos atualizado!');
     } else {
       setPinChangeError('Erro ao salvar novo PIN Master.');
+    }
+  };
+
+  // Handle Username Change Action
+  const handleUsernameChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUsernameChangeError(null);
+    setUsernameChangeSuccess(null);
+    setIsChangingUsername(true);
+
+    try {
+      const trimmed = newUsernameInput.trim();
+      if (trimmed.length < 3) {
+        setUsernameChangeError('O novo nome de usuário deve ter no mínimo 3 caracteres.');
+        return;
+      }
+
+      await saveAdminAuthToCloud({ username: trimmed });
+      setAdminUsername(trimmed);
+      setCurrentUsernameDisplay(trimmed);
+      setLoginUser(trimmed);
+      addSecurityLog('CONFIG_CHANGED', `Nome de usuário administrativo alterado para "${trimmed}".`, 'info');
+      setSecurityLogs(getSecurityLogs());
+      setUsernameChangeSuccess(`Nome de usuário alterado com sucesso para "${trimmed}"!`);
+      setNewUsernameInput('');
+      onShowToast('Nome de usuário administrativo atualizado com sucesso!');
+    } catch {
+      setUsernameChangeError('Erro ao atualizar nome de usuário.');
+    } finally {
+      setIsChangingUsername(false);
+    }
+  };
+
+  // Handle Mandatory First Access Setup Submission
+  const handleInitialSetupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSetupError(null);
+    setSetupSubmitting(true);
+
+    try {
+      const trimmedUser = setupUsername.trim();
+      const trimmedPass = setupPassword.trim();
+      const trimmedPassConfirm = setupPasswordConfirm.trim();
+      const trimmedPin = setupPin.trim();
+      const trimmedPinConfirm = setupPinConfirm.trim();
+
+      // 1. Validate Username
+      if (trimmedUser.length < 3) {
+        setSetupError('O novo usuário deve ter no mínimo 3 caracteres.');
+        return;
+      }
+      if (trimmedUser.toLowerCase() === 'admin') {
+        setSetupError('O novo usuário não pode ser "admin". Escolha um nome exclusivo.');
+        return;
+      }
+
+      // 2. Validate Password
+      if (trimmedPass.length < 6) {
+        setSetupError('A nova senha deve ter no mínimo 6 caracteres.');
+        return;
+      }
+      if (trimmedPass === 'admin123') {
+        setSetupError('A nova senha não pode ser a senha padrão "admin123". Escolha uma nova senha segura.');
+        return;
+      }
+      if (trimmedPass !== trimmedPassConfirm) {
+        setSetupError('A confirmação da nova senha não coincide.');
+        return;
+      }
+
+      // 3. Validate PIN Master
+      if (!/^\d{6}$/.test(trimmedPin)) {
+        setSetupError('O novo PIN Master deve conter exatamente 6 números.');
+        return;
+      }
+      if (trimmedPin === '878787') {
+        setSetupError('O novo PIN Master não pode ser o de fábrica "878787". Escolha um PIN exclusivo de 6 dígitos.');
+        return;
+      }
+      if (trimmedPin !== trimmedPinConfirm) {
+        setSetupError('A confirmação do novo PIN Master não coincide.');
+        return;
+      }
+
+      // 4. Save everything to Firestore and localStorage
+      await saveAdminAuthToCloud({
+        username: trimmedUser,
+        password: trimmedPass,
+        masterPin: trimmedPin,
+        isInitialSetupCompleted: true,
+      });
+
+      // Update state
+      setLoginUser(trimmedUser);
+      setCurrentUsernameDisplay(trimmedUser);
+      setMustCompleteInitialSetup(false);
+
+      // Best-effort Firebase Auth update
+      try {
+        await updateFirebaseAdminPassword('admin123', trimmedPass, ADMIN_PRIMARY_EMAIL);
+      } catch (authErr) {
+        console.warn('Firebase Auth sync notice during initial setup:', authErr);
+      }
+
+      addSecurityLog(
+        'CONFIG_CHANGED',
+        `Configuração obrigatória de primeiro acesso concluída: Usuário alterado para "${trimmedUser}", nova senha e novo PIN Master definidos com sucesso.`,
+        'info'
+      );
+      setSecurityLogs(getSecurityLogs());
+      onShowToast('Credenciais atualizadas com sucesso! Guarde suas novas credenciais com segurança.');
+    } catch {
+      setSetupError('Erro ao salvar as novas credenciais. Tente novamente.');
+    } finally {
+      setSetupSubmitting(false);
     }
   };
 
@@ -1554,7 +1737,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
 
                 <p className="text-[11px] text-slate-500 text-center">
-                  PIN padrão de fábrica: <strong className="font-mono text-slate-700">872618</strong> (pode ser alterado ou desativado na aba Segurança).
+                  PIN padrão de fábrica: <strong className="font-mono text-slate-700">878787</strong> (pode ser alterado ou desativado na aba Segurança).
                 </p>
 
                 <div className="text-center pt-1">
@@ -1589,7 +1772,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Primeiro acesso de fábrica? Usuário: <strong className="text-slate-900 font-mono">admin</strong> &bull; Senha inicial: <strong className="text-slate-900 font-mono">admin123</strong>
                 </p>
                 <p className="text-[10px] text-slate-500 mt-1">
-                  PIN Master de fábrica: <strong className="text-slate-800 font-mono">872618</strong> (personalizável na aba Segurança).
+                  PIN Master de fábrica: <strong className="text-slate-800 font-mono">878787</strong> (obrigatório alterar após primeiro login).
                 </p>
               </div>
             )}
@@ -1602,6 +1785,151 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
             >
               ← Voltar para a Página Inicial
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // MANDATORY FIRST LOGIN CREDENTIALS SETUP
+  // ==========================================
+  if (isAdminLoggedIn && mustCompleteInitialSetup) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl border-2 border-orange-400 p-6 sm:p-8 max-w-lg w-full shadow-2xl relative overflow-hidden">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 mb-3 shadow-sm">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <div>
+              <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black uppercase tracking-wider mb-2">
+                Configuração Obrigatória de Primeiro Acesso
+              </span>
+            </div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+              Atualize suas Credenciais de Acesso
+            </h2>
+            <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+              Por segurança, após o primeiro login é <strong>obrigatório alterar o Usuário, a Senha e o PIN Master de fábrica</strong> antes de liberar o acesso completo ao painel.
+            </p>
+          </div>
+
+          {setupError && (
+            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>{setupError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleInitialSetupSubmit} className="space-y-4">
+            {/* 1. Novo Nome de Usuário */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 mb-1">
+                1. Novo Nome de Usuário *
+              </label>
+              <p className="text-[11px] text-slate-500 mb-2">
+                Substitui o padrão de fábrica <strong className="font-mono text-slate-700">admin</strong>. Mínimo 3 caracteres.
+              </p>
+              <input
+                type="text"
+                required
+                value={setupUsername}
+                onChange={(e) => setSetupUsername(e.target.value)}
+                placeholder="Digite seu novo usuário (ex: meu-usuario)"
+                className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-semibold"
+              />
+            </div>
+
+            {/* 2. Nova Senha */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 mb-1">
+                2. Nova Senha de Acesso *
+              </label>
+              <p className="text-[11px] text-slate-500 mb-2">
+                Substitui o padrão de fábrica <strong className="font-mono text-slate-700">admin123</strong>. Mínimo 6 caracteres.
+              </p>
+              <div className="space-y-2">
+                <div className="relative">
+                  <input
+                    type={showSetupPassword ? 'text' : 'password'}
+                    required
+                    value={setupPassword}
+                    onChange={(e) => setSetupPassword(e.target.value)}
+                    placeholder="Digite sua nova senha..."
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-white rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupPassword(!showSetupPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showSetupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={setupPasswordConfirm}
+                  onChange={(e) => setSetupPasswordConfirm(e.target.value)}
+                  placeholder="Confirme exatamente a nova senha..."
+                  className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* 3. Novo PIN Master */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 mb-1">
+                3. Novo PIN Master (6 Dígitos Numéricos) *
+              </label>
+              <p className="text-[11px] text-slate-500 mb-2">
+                Substitui o padrão inicial <strong className="font-mono text-slate-700">878787</strong>. Digite 6 números.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <input
+                    type="password"
+                    required
+                    maxLength={6}
+                    value={setupPin}
+                    onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Novo PIN (6 dígitos)"
+                    className="w-full text-center font-mono font-bold tracking-widest px-3 py-2.5 bg-white rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password"
+                    required
+                    maxLength={6}
+                    value={setupPinConfirm}
+                    onChange={(e) => setSetupPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Repita o novo PIN"
+                    className="w-full text-center font-mono font-bold tracking-widest px-3 py-2.5 bg-white rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={setupSubmitting}
+              className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 active:scale-98 disabled:opacity-60 text-white font-extrabold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 transition-all cursor-pointer mt-4"
+            >
+              <Check className="w-5 h-5" />
+              <span>{setupSubmitting ? 'Salvando com segurança...' : 'Salvar Novas Credenciais e Entrar no Painel'}</span>
+            </button>
+          </form>
+
+          <div className="text-center mt-4 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-xs text-slate-500 hover:text-slate-800 font-medium cursor-pointer"
+            >
+              Sair e configurar mais tarde
             </button>
           </div>
         </div>
@@ -3405,9 +3733,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 5: Security & Password Modification */}
+      {/* TAB 5: Security & Credentials Modification */}
       {activeTab === 'security' && (
         <>
+          {/* Card 1: Alteração de Nome de Usuário */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto mb-6">
+            <div className="flex items-center gap-3 pb-6 mb-6 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-xs">
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Nome de Usuário Administrativo
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Usuário atual: <strong className="font-mono text-orange-600 font-bold">{currentUsernameDisplay}</strong>. Altere seu identificador de login quando desejar.
+                </p>
+              </div>
+            </div>
+
+            {usernameChangeSuccess && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{usernameChangeSuccess}</span>
+              </div>
+            )}
+
+            {usernameChangeError && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{usernameChangeError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUsernameChangeSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Novo Nome de Usuário * (mínimo 3 caracteres)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newUsernameInput}
+                  onChange={(e) => setNewUsernameInput(e.target.value)}
+                  placeholder={`Ex: novo_usuario`}
+                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-medium"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isChangingUsername || !newUsernameInput.trim()}
+                className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+              >
+                <Check className="w-4 h-4 text-orange-400" />
+                <span>{isChangingUsername ? 'Atualizando usuário...' : 'Salvar Novo Nome de Usuário'}</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Card 2: Alteração de Senha */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto">
           <div className="flex items-center gap-3 pb-6 mb-6 border-b border-slate-100">
             <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-900 flex items-center justify-center font-bold">
@@ -3418,7 +3803,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 Segurança e Alteração de Senha
               </h2>
               <p className="text-xs text-slate-500">
-                Altere a senha de acesso ao Painel Administrativo. A nova senha será salva no seu navegador.
+                Altere a senha de acesso ao Painel Administrativo. A nova senha é salva no Firestore e sincronizada permanentemente.
               </p>
             </div>
           </div>
@@ -3450,7 +3835,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   required
                   value={currentPasswordInput}
                   onChange={(e) => setCurrentPasswordInput(e.target.value)}
-                  placeholder="Informe sua senha atual (padrão inicial: admin123)"
+                  placeholder="Informe sua senha atual..."
                   className="w-full pl-4 pr-10 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
                 />
                 <button

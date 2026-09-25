@@ -20,7 +20,7 @@ const STORAGE_KEYS = {
 export const MAX_ALLOWED_ATTEMPTS = 5;
 export const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lockout
 export const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes auto-lock
-export const DEFAULT_MASTER_PIN = '872618'; // 6-digit factory PIN
+export const DEFAULT_MASTER_PIN = '878787'; // 6-digit factory PIN requested: 878787
 
 export interface SecurityLogEntry {
   id: string;
