@@ -82,7 +82,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       {/* Card Content Area */}
-      <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between">
+      <div className="p-2 sm:p-4 flex-1 flex flex-col justify-between">
         <div>
           {/* Metadata Row: Category & Social Proof */}
           <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-500 mb-1 sm:mb-1.5">
@@ -138,26 +138,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Action Button Row - 50% / 50% space for "Ver Detalhes" and "Ir à Loja" */}
-        <div className="pt-2.5 sm:pt-3 border-t border-slate-100 grid grid-cols-2 gap-1.5 sm:gap-2">
+        <div className="pt-2 sm:pt-3 border-t border-slate-100 grid grid-cols-2 gap-1.5 sm:gap-2.5">
           {/* Primary View Action */}
           <button
             type="button"
             onClick={() => onOpenProduct(product)}
-            className="w-full py-1.5 sm:py-2 px-1.5 sm:px-2.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-semibold text-[10px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-w-0"
+            className="w-full py-1.5 sm:py-2.5 px-1 sm:px-3 rounded-lg sm:rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-[10px] sm:text-xs md:text-sm flex items-center justify-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-w-0"
           >
-            <span className="truncate">Ver Detalhes</span>
-            <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="whitespace-nowrap font-bold">Ver Detalhes</span>
+            <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
           </button>
 
           {/* Direct Partner Store Shortcut */}
           <button
             type="button"
             onClick={(e) => onDirectStoreClick(product, e)}
-            className="w-full py-1.5 sm:py-2 px-1.5 sm:px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-[10px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-w-0"
+            className="w-full py-1.5 sm:py-2.5 px-1 sm:px-3 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] sm:text-xs md:text-sm flex items-center justify-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-w-0"
             title={`Abrir direto no site oficial do parceiro (${product.store})`}
           >
-            <span className="truncate">Ir à Loja</span>
-            <ExternalLink className="w-3 h-3 text-orange-400 shrink-0" />
+            <span className="whitespace-nowrap font-bold">Ir à Loja</span>
+            <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400 shrink-0" />
           </button>
         </div>
       </div>

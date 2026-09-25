@@ -42,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <span>As melhores ofertas e achadinhos verificados com preços e links das lojas oficiais!</span>
       </div>
 
-      <div className="max-w-6xl mx-auto px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
         {/* Brand Logo & Name */}
         <button
           onClick={onGoHome}

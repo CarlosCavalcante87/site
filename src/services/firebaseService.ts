@@ -89,6 +89,24 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 /**
+ * Recursively removes any keys with `undefined` values from an object,
+ * preventing FirebaseError: Unsupported field value: undefined.
+ */
+export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Partial<T> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        clean[key] = sanitizeForFirestore(value);
+      } else {
+        clean[key] = value;
+      }
+    }
+  }
+  return clean as Partial<T>;
+}
+
+/**
  * Validate Connection to Firestore on startup as mandated by Firebase Skill
  */
 export async function testFirestoreConnection(): Promise<void> {
@@ -158,7 +176,13 @@ export function subscribeToProducts(
       (snapshot) => {
         if (!snapshot.empty) {
           const items: Product[] = [];
-          snapshot.forEach((d) => items.push(d.data() as Product));
+          snapshot.forEach((d) => {
+            const data = d.data() as Product;
+            items.push({
+              ...data,
+              id: data.id || d.id,
+            });
+          });
           const normalized = normalizeProductOrders(items);
           saveLocalProducts(normalized);
           onUpdate(normalized);
@@ -281,10 +305,12 @@ export function subscribeToSiteConfig(
  */
 export async function addProductToCloud(product: Product): Promise<void> {
   const current = getLocalProducts();
-  saveLocalProducts([product, ...current]);
+  const normalized = normalizeProductOrders([product, ...current]);
+  saveLocalProducts(normalized);
 
   try {
-    await setDoc(doc(db, PRODUCTS_COL, product.id), product);
+    const cleanData = sanitizeForFirestore(product);
+    await setDoc(doc(db, PRODUCTS_COL, product.id), cleanData);
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, `${PRODUCTS_COL}/${product.id}`);
   }
@@ -299,7 +325,8 @@ export async function updateProductInCloud(id: string, updates: Partial<Product>
   }
 
   try {
-    await updateDoc(doc(db, PRODUCTS_COL, id), updates);
+    const cleanUpdates = sanitizeForFirestore(updates);
+    await updateDoc(doc(db, PRODUCTS_COL, id), cleanUpdates);
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${id}`);
   }
@@ -321,7 +348,7 @@ export async function swapProductOrdersInCloud(
 
 export async function deleteProductFromCloud(id: string): Promise<void> {
   const current = getLocalProducts().filter((p) => p.id !== id);
-  saveLocalProducts(current);
+  saveLocalProducts(normalizeProductOrders(current));
 
   try {
     await deleteDoc(doc(db, PRODUCTS_COL, id));

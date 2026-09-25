@@ -382,6 +382,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Product Edit / Create form state
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
@@ -837,21 +839,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       badges: p.badges && p.badges.length > 0 ? [...p.badges] : [],
       originalPrice: p.originalPrice !== undefined ? p.originalPrice : '',
       price: p.price !== undefined ? p.price : '',
-      isFeatured: p.isFeatured,
+      isFeatured: !!p.isFeatured,
       rating: p.rating !== undefined ? p.rating : 4.9,
       reviewCount: p.reviewCount !== undefined ? p.reviewCount : 384,
       clicksCount: p.clicksCount !== undefined ? p.clicksCount : 1420,
       order: p.order || 1,
     });
     setActiveTab('new-product');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteClick = (id: string, title: string) => {
-    if (window.confirm(`Tem certeza que deseja remover o produto "${title}"?`)) {
-      deleteProduct(id);
-      deleteProductFromCloud(id);
+    setProductToDelete({ id, title });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    setIsDeletingProduct(true);
+    try {
+      deleteProduct(productToDelete.id);
+      await deleteProductFromCloud(productToDelete.id);
       onRefreshData();
-      onShowToast('Produto removido com sucesso!');
+      onShowToast(`Produto "${productToDelete.title}" excluído com sucesso!`);
+    } catch (err) {
+      console.error('Delete error:', err);
+      onShowToast('Erro ao excluir produto. Tente novamente.');
+    } finally {
+      setIsDeletingProduct(false);
+      setProductToDelete(null);
     }
   };
 
@@ -859,12 +874,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
 
     if (!formData.title.trim()) {
-      alert('Por favor, informe o título do produto.');
+      onShowToast('Por favor, informe o título do produto.');
       return;
     }
 
     if (!formData.affiliateUrl.trim()) {
-      alert('Por favor, informe o link oficial da oferta (URL de afiliado).');
+      onShowToast('Por favor, informe o link oficial da oferta (URL de afiliado).');
       return;
     }
 
@@ -899,25 +914,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         });
       }
 
-      const updates = {
-        title: formData.title,
-        subtitle: formData.subtitle,
+      const updates: Partial<Product> = {
+        title: formData.title.trim(),
+        subtitle: formData.subtitle.trim(),
         store: formData.store,
-        affiliateUrl: formData.affiliateUrl,
+        affiliateUrl: formData.affiliateUrl.trim(),
         category: formData.category,
         order: desiredOrder,
         images: finalImages,
-        description: formData.description,
+        description: formData.description || '',
         highlights: cleanHighlights,
         badges: formData.badges,
-        originalPrice: parsedOriginalPrice,
-        price: parsedPrice,
-        priceHistory: updatedHistory.length > 0 ? updatedHistory : existingProduct?.priceHistory,
         isFeatured: formData.isFeatured,
         rating: Number(formData.rating) || 4.9,
         reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
         clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
       };
+
+      if (parsedOriginalPrice !== undefined) {
+        updates.originalPrice = parsedOriginalPrice;
+      }
+      if (parsedPrice !== undefined) {
+        updates.price = parsedPrice;
+      }
+      if (updatedHistory.length > 0) {
+        updates.priceHistory = updatedHistory;
+      } else if (existingProduct?.priceHistory) {
+        updates.priceHistory = existingProduct.priceHistory;
+      }
+
       updateProduct(editingProductId, updates);
       updateProductInCloud(editingProductId, updates);
       onShowToast('Produto atualizado com sucesso!');
@@ -926,26 +951,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const parsedOriginalPrice = formData.originalPrice !== '' && !isNaN(Number(formData.originalPrice)) ? Number(formData.originalPrice) : undefined;
       const parsedPrice = formData.price !== '' && !isNaN(Number(formData.price)) ? Number(formData.price) : undefined;
 
-      const created = addProduct({
-        title: formData.title,
-        subtitle: formData.subtitle,
+      const newProductPayload: any = {
+        title: formData.title.trim(),
+        subtitle: formData.subtitle.trim(),
         store: formData.store,
-        affiliateUrl: formData.affiliateUrl,
+        affiliateUrl: formData.affiliateUrl.trim(),
         category: formData.category,
         order: desiredOrder,
         images: finalImages,
         description: formData.description || 'Descrição detalhada do achadinho.',
         highlights: cleanHighlights.length > 0 ? cleanHighlights : ['Produto verificado', 'Envio rápido'],
         badges: formData.badges,
-        originalPrice: parsedOriginalPrice,
-        price: parsedPrice,
-        priceHistory: parsedPrice ? [{ date: new Date().toISOString(), price: parsedPrice }] : undefined,
         isFeatured: formData.isFeatured,
         rating: Number(formData.rating) || 4.9,
         reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
         clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
         verifiedDeal: true,
-      });
+      };
+
+      if (parsedOriginalPrice !== undefined) {
+        newProductPayload.originalPrice = parsedOriginalPrice;
+      }
+      if (parsedPrice !== undefined) {
+        newProductPayload.price = parsedPrice;
+        newProductPayload.priceHistory = [{ date: new Date().toISOString(), price: parsedPrice }];
+      }
+
+      const created = addProduct(newProductPayload);
       addProductToCloud(created);
       onShowToast('Novo produto cadastrado com sucesso!');
     }
@@ -953,6 +985,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     resetForm();
     onRefreshData();
     setActiveTab('products');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleAddImageField = () => {
@@ -1631,28 +1664,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         {/* Quick Action Buttons on Mobile & Desktop */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 pt-3">
+        <div className="flex flex-wrap items-center gap-2 pt-3">
           <button
             onClick={() => {
               resetForm();
               setActiveTab('new-product');
             }}
-            className="col-span-2 sm:col-auto px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer shadow-sm shadow-orange-500/25 hover:shadow-lg hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 hover:ring-2 hover:ring-orange-400/50"
+            className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer shadow-sm shadow-orange-500/25 hover:shadow-lg hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 hover:ring-2 hover:ring-orange-400/50"
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar Novo Produto</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('banners')}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
-              activeTab === 'banners'
-                ? 'bg-orange-600 text-white border-orange-600 shadow-sm shadow-orange-500/20 hover:bg-orange-700'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 hover:shadow-xs'
-            }`}
-          >
-            <ImageIcon className="w-3.5 h-3.5 text-orange-500" />
-            <span>3 Banners</span>
           </button>
 
           <button
@@ -3790,6 +3811,63 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Restaurar Fábrica</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Product Confirmation Modal */}
+      {productToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5 text-left">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Excluir Produto
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Esta ação não pode ser desfeita.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+              Tem certeza que deseja remover permanentemente o achadinho:
+              <strong className="block mt-1 text-slate-900 font-bold">
+                &ldquo;{productToDelete.title}&rdquo;
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingProduct}
+                onClick={() => setProductToDelete(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingProduct}
+                onClick={handleConfirmDelete}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-sm shadow-rose-500/30"
+              >
+                {isDeletingProduct ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Sim, Excluir Produto</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

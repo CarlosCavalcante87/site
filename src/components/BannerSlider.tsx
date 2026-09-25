@@ -69,7 +69,7 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
   };
 
   return (
-    <section className="max-w-6xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-2">
+    <section className="max-w-7xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-2">
       {/* Banner puro sem textos e sem links */}
       <div 
         className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-sm group h-[140px] xs:h-[170px] sm:h-[220px] md:h-[270px] lg:h-[300px] border border-slate-200/80 select-none"

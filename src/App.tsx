@@ -293,10 +293,16 @@ export default function App() {
   };
 
   // Mobile Grid Class based on Admin Configuration (Dupla vs Simples)
+  // When Double View is active on mobile: use tighter gap (gap-2 sm:gap-6) and maximized width
+  // to give maximum possible width to both cards on mobile screens!
   const isMobileDouble = siteConfig.mobileDoubleColumns !== false;
   const productsGridClass = isMobileDouble
-    ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-6'
-    : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6';
+    ? 'grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 sm:gap-6'
+    : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6';
+
+  const sectionPaddingClass = isMobileDouble
+    ? 'max-w-7xl mx-auto px-2 sm:px-6'
+    : 'max-w-7xl mx-auto px-3.5 sm:px-6';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-slate-800 antialiased">
@@ -341,8 +347,8 @@ export default function App() {
 
             {/* SEÇÃO EXCLUSIVA: ÁREA DE DESTAQUE PRIORITÁRIO */}
             {featuredProducts.length > 0 && !searchQuery && !selectedCategory && !selectedStore && !selectedBadge && !onlyFeatured && (
-              <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2">
-                <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-white rounded-3xl border-2 border-amber-300 p-5 sm:p-7 shadow-sm">
+              <section className={`${sectionPaddingClass} pt-4 sm:pt-6 pb-2`}>
+                <div className={`bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-white rounded-2xl sm:rounded-3xl border-2 border-amber-300 ${isMobileDouble ? 'p-2 sm:p-7' : 'p-4 sm:p-7'} shadow-sm`}>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-orange-500/25">
@@ -386,7 +392,7 @@ export default function App() {
             )}
 
             {/* Main Products Grid Section */}
-            <section id="catalogo-achados" className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+            <section id="catalogo-achados" className={`${sectionPaddingClass} py-6 sm:py-8`}>
               {/* Controls bar: Results Count & Active Filter Pills */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
                 <div className="flex items-center gap-2 flex-wrap">
