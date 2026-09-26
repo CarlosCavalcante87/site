@@ -24,11 +24,11 @@ export const DEFAULT_IMAGE = '/og-image.jpg';
  */
 export function getPublicBaseUrl(): string {
   if (typeof window === 'undefined') {
-    return 'https://ais-pre-u4snn7m472n36a6kgbkxnl-457784679767.us-east5.run.app';
+    return 'https://achados-cctech.vercel.app';
   }
   const origin = window.location.origin;
   if (origin.includes('ais-dev-')) {
-    return origin.replace('ais-dev-', 'ais-pre-');
+    return 'https://achados-cctech.vercel.app';
   }
   return origin;
 }
@@ -67,8 +67,8 @@ export function setCanonicalUrl(url: string) {
 export function toAbsoluteUrl(pathOrUrl: string): string {
   if (!pathOrUrl) return '';
   if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-    if (pathOrUrl.includes('ais-dev-')) {
-      return pathOrUrl.replace('ais-dev-', 'ais-pre-');
+    if (pathOrUrl.includes('ais-dev-') || pathOrUrl.includes('ais-pre-')) {
+      return pathOrUrl.replace(/https:\/\/(ais-dev|ais-pre)-[^/]+/, getPublicBaseUrl());
     }
     return pathOrUrl;
   }
@@ -92,7 +92,7 @@ export function updateStructuredData(product?: Product | null) {
     document.head.appendChild(script);
   }
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-u4snn7m472n36a6kgbkxnl-457784679767.us-east5.run.app';
+  const origin = getPublicBaseUrl();
 
   if (product) {
     // Rich Product Schema for Google Search Snippets (Price, Stock, Rating, Image)

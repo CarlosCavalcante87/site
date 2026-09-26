@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -72,12 +72,16 @@ import {
   Dumbbell,
   Car,
   Dog,
-  Loader2
+  Loader2,
+  Share2,
+  Facebook
 } from 'lucide-react';
 import {
   removeBannerImage,
-  uploadBannerImage
+  uploadBannerImage,
+  uploadSocialShareImage
 } from '../services/bannerUpload';
+import { SocialSharePreviewModal } from './SocialSharePreviewModal';
 
 export const CATEGORY_ICON_GROUPS = [
   {
@@ -433,6 +437,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Tab navigation
   const [activeTab, setActiveTab] = useState<'products' | 'new-product' | 'banners' | 'categories' | 'stats' | 'security' | 'backup'>('products');
   const [searchAdmin, setSearchAdmin] = useState('');
+  const [showSocialModal, setShowSocialModal] = useState(false);
   
   // Banners & Site Settings State
   const [banners, setBanners] = useState<Banner[]>(() => getStoredBanners());
@@ -442,6 +447,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [showManualBannerUrl, setShowManualBannerUrl] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => getStoredSiteConfig());
+  const [isUploadingSocialImg, setIsUploadingSocialImg] = useState(false);
+  const [socialImgProgress, setSocialImgProgress] = useState(0);
+  const [socialUrlInput, setSocialUrlInput] = useState(() => getStoredSiteConfig().socialShareImage || 'https://achados-cctech.vercel.app/og-image.jpg');
+  const socialFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (siteConfig.socialShareImage) {
+      setSocialUrlInput(siteConfig.socialShareImage);
+    }
+  }, [siteConfig.socialShareImage]);
 
   useEffect(() => {
     const unsub = subscribeToSiteConfig((cloudConfig) => {
@@ -1099,6 +1114,85 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     saveStoredSiteConfig(siteConfig);
     saveSiteConfigToCloud(siteConfig);
     onShowToast('Configurações do Banner de Chamada salvas com sucesso!');
+  };
+
+  // Handle Social Share (WhatsApp / Facebook) Config Updates
+  const handleSaveSocialConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveStoredSiteConfig(siteConfig);
+    saveSiteConfigToCloud(siteConfig);
+    onShowToast('Configurações de compartilhamento social (WhatsApp / Facebook) salvas com sucesso!');
+  };
+
+  const handleProcessSocialImageFile = async (file: File) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      onShowToast('A imagem deve ter no máximo 10 MB.');
+      return;
+    }
+
+    setIsUploadingSocialImg(true);
+    setSocialImgProgress(25);
+
+    // Hard safety timer: guarantee the loader disappears within 2.5s under any condition
+    const safetyTimer = setTimeout(() => {
+      setIsUploadingSocialImg(false);
+    }, 2500);
+
+    try {
+      const url = await uploadSocialShareImage(file, (prog) => {
+        setSocialImgProgress(prog);
+      });
+      clearTimeout(safetyTimer);
+      const updated = {
+        ...siteConfig,
+        socialShareImage: url,
+      };
+      setSiteConfig(updated);
+      setSocialUrlInput(url);
+      saveStoredSiteConfig(updated);
+      saveSiteConfigToCloud(updated);
+      onShowToast('Imagem de compartilhamento atualizada e comprimida com sucesso!');
+    } catch (err) {
+      clearTimeout(safetyTimer);
+      console.error('Erro ao processar imagem social:', err);
+      onShowToast('Erro ao processar imagem social. Tente novamente.');
+    } finally {
+      setIsUploadingSocialImg(false);
+    }
+  };
+
+  const handleApplySocialImageUrl = () => {
+    const trimmed = socialUrlInput.trim();
+    if (!trimmed) {
+      onShowToast('Por favor, informe a URL da imagem de SEO.');
+      return;
+    }
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('/')) {
+      onShowToast('A URL deve começar com https://, http:// ou /');
+      return;
+    }
+    const updated = {
+      ...siteConfig,
+      socialShareImage: trimmed,
+    };
+    setSiteConfig(updated);
+    saveStoredSiteConfig(updated);
+    saveSiteConfigToCloud(updated);
+    onShowToast('Imagem de SEO inserida e atualizada com sucesso!');
+  };
+
+  const handleRestoreDefaultSocialImage = () => {
+    const defaultUrl = 'https://achados-cctech.vercel.app/og-image.jpg';
+    setSocialUrlInput(defaultUrl);
+    const updated = {
+      ...siteConfig,
+      socialShareImage: defaultUrl,
+    };
+    setSiteConfig(updated);
+    saveStoredSiteConfig(updated);
+    saveSiteConfigToCloud(updated);
+    onShowToast('Imagem padrão de SEO restaurada com sucesso!');
   };
 
   const handleToggleBottomCtaActive = (isActive: boolean) => {
@@ -2435,6 +2529,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Segurança</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowSocialModal(true)}
+            className="shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 cursor-pointer bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 shadow-xs hover:-translate-y-0.5 active:translate-y-0"
+            title="Simular e testar como o link do site aparece no WhatsApp e Facebook"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Testar Card Social</span>
+          </button>
         </div>
       </div>
 
@@ -3352,6 +3456,265 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 >
                   <Check className="w-4 h-4 text-emerald-200" />
                   <span>Salvar Configuração do Banner de Chamada</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* SECTION: Social Share Image & OpenGraph Meta (WhatsApp / Facebook) */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Imagem de Compartilhamento Social (WhatsApp, Facebook & SEO)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Defina a foto de capa oficial (og:image), o domínio e os textos que aparecem ao compartilhar o link do seu site.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowSocialModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <Eye className="w-4 h-4 text-emerald-600" />
+                  <span>Ver Simulador do Card</span>
+                </button>
+                <a
+                  href={`https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(siteConfig.siteUrl || 'https://achados-cctech.vercel.app/')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-[#1877F2]/10 hover:bg-[#1877F2]/20 text-[#1877F2] text-xs font-bold border border-[#1877F2]/30 flex items-center gap-1.5 transition-colors no-underline shrink-0"
+                >
+                  <Facebook className="w-3.5 h-3.5 fill-current" />
+                  <span>Facebook Debugger</span>
+                </a>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveSocialConfig} className="space-y-6 max-w-3xl">
+              {/* Image Preview & Upload Row */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                {/* Visual Preview Box */}
+                <div className="md:col-span-5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Prévia da Imagem Atual
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleRestoreDefaultSocialImage}
+                      className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold cursor-pointer hover:underline"
+                    >
+                      Restaurar padrão
+                    </button>
+                  </div>
+                  <div className="aspect-[1.91/1] w-full rounded-2xl overflow-hidden bg-slate-900 border-2 border-slate-300 relative group flex items-center justify-center shadow-xs">
+                    <img
+                      src={siteConfig.socialShareImage || 'https://achados-cctech.vercel.app/og-image.jpg'}
+                      alt="Imagem de compartilhamento SEO"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/og-image.jpg';
+                      }}
+                    />
+                    {isUploadingSocialImg && (
+                      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xs flex flex-col items-center justify-center text-white p-4">
+                        <Loader2 className="w-7 h-7 animate-spin mb-2 text-orange-400" />
+                        <span className="text-xs font-bold">Otimizando e inserindo imagem...</span>
+                        <span className="text-[10px] text-slate-300 font-mono mt-1">{socialImgProgress}%</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Action buttons directly below preview */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={isUploadingSocialImg}
+                      onClick={() => socialFileInputRef.current?.click()}
+                      className="flex-1 py-2 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Inserir Imagem (Arquivo)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSocialModal(true)}
+                      className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer border border-slate-200"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Simular</span>
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1 pt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Padrão 1200x630 px com compressão &lt; 200KB (compatível com WhatsApp).</span>
+                  </p>
+                </div>
+
+                {/* Upload & Direct URL Controls */}
+                <div className="md:col-span-7 space-y-4">
+                  {/* Option 1: File Upload */}
+                  <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-orange-950">
+                        Opção 1: Enviar Arquivo do Celular ou Computador
+                      </label>
+                      <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md">
+                        Auto-Comprime
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Selecione qualquer foto (JPG, PNG ou WebP). O sistema ajusta a proporção para 1200x630 e reduz o peso para menos de 200 KB para não ser descartada pelo WhatsApp.
+                    </p>
+                    <input
+                      ref={socialFileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={isUploadingSocialImg}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleProcessSocialImageFile(file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingSocialImg}
+                      onClick={() => socialFileInputRef.current?.click()}
+                      className="w-full py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>{isUploadingSocialImg ? 'Enviando e Otimizando Imagem...' : 'Inserir Imagem de SEO (Escolher Arquivo)'}</span>
+                    </button>
+                  </div>
+
+                  {/* Option 2: Direct URL */}
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Opção 2: Inserir Imagem por Link Direto (URL)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleRestoreDefaultSocialImage}
+                        className="text-[11px] text-orange-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        Restaurar padrão
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Cole o link direto da imagem e clique no botão <strong>Inserir Imagem</strong>.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={socialUrlInput}
+                        onChange={(e) => setSocialUrlInput(e.target.value)}
+                        placeholder="https://achados-cctech.vercel.app/og-image.jpg"
+                        className="flex-1 min-w-0 px-3.5 py-2.5 bg-white rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-mono shadow-2xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplySocialImageUrl}
+                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-orange-400" />
+                        <span>Inserir Imagem</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Site URL / Canonical Domain Field */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Endereço / URL Principal do Site (Domínio da Loja)
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={siteConfig.siteUrl || ''}
+                  onChange={(e) =>
+                    setSiteConfig({
+                      ...siteConfig,
+                      siteUrl: e.target.value,
+                    })
+                  }
+                  placeholder="https://achados-cctech.vercel.app"
+                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Esse é o domínio canônico onde o seu site está publicado no Vercel (ou seu domínio próprio). Os robôs do Facebook e WhatsApp usam essa base para validar os links.
+                </p>
+              </div>
+
+              {/* Title & Description Fields */}
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Título de Compartilhamento (og:title)
+                  </label>
+                  <input
+                    type="text"
+                    value={siteConfig.socialShareTitle || ''}
+                    onChange={(e) =>
+                      setSiteConfig({
+                        ...siteConfig,
+                        socialShareTitle: e.target.value,
+                      })
+                    }
+                    placeholder="Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet"
+                    className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Descrição de Apoio (og:description)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={siteConfig.socialShareDescription || ''}
+                    onChange={(e) =>
+                      setSiteConfig({
+                        ...siteConfig,
+                        socialShareDescription: e.target.value,
+                      })
+                    }
+                    placeholder="Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros."
+                    className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md shadow-orange-600/20"
+                >
+                  <Check className="w-4 h-4 text-orange-200" />
+                  <span>Salvar Configurações Sociais</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSocialModal(true)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer border border-slate-200"
+                >
+                  <Eye className="w-4 h-4 text-slate-600" />
+                  <span>Testar Prévia</span>
                 </button>
               </div>
             </form>
@@ -5014,6 +5377,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       <BannerGuideModal
         isOpen={isGuideOpen}
         onClose={() => setIsGuideOpen(false)}
+      />
+
+      {/* Social Share & OpenGraph Preview Modal */}
+      <SocialSharePreviewModal
+        isOpen={showSocialModal}
+        onClose={() => setShowSocialModal(false)}
+        product={null}
+        onShowToast={onShowToast}
       />
     </div>
   );

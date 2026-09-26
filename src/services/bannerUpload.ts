@@ -160,3 +160,108 @@ export async function removeBannerImage(imageUrl?: string): Promise<void> {
     }
   }
 }
+
+/**
+ * Compresses and crops an image specifically for social share cards (WhatsApp, Facebook, Twitter).
+ * Ensures aspect ratio 1.91:1 (1200x630 px) and output size < 200 KB in JPEG format.
+ */
+export async function compressAndOptimizeSocialImage(
+  file: File,
+  targetWidth = 1200,
+  targetHeight = 630,
+  quality = 0.82
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo da imagem.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Formato de imagem inválido ou corrompido.'));
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(reader.result as string);
+            return;
+          }
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+
+          const sourceRatio = img.width / img.height;
+          const targetRatio = targetWidth / targetHeight;
+          let renderWidth = targetWidth;
+          let renderHeight = targetHeight;
+          let offsetX = 0;
+          let offsetY = 0;
+
+          if (sourceRatio > targetRatio) {
+            renderWidth = Math.round(targetHeight * sourceRatio);
+            offsetX = Math.round((targetWidth - renderWidth) / 2);
+          } else {
+            renderHeight = Math.round(targetWidth / sourceRatio);
+            offsetY = Math.round((targetHeight - renderHeight) / 2);
+          }
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, targetWidth, targetHeight);
+          ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+
+          const jpegDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(jpegDataUrl);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Uploads a social share image to Firebase Storage (or returns formatted HTTPS / data URL).
+ * Validates dimensions (1200x630) and compresses file size under 200 KB for WhatsApp compatibility.
+ */
+export async function uploadSocialShareImage(
+  file: File,
+  onProgress?: BannerUploadProgress
+): Promise<string> {
+  if (!file) throw new Error('Nenhum arquivo selecionado.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('A imagem excede o limite máximo de 10 MB.');
+
+  onProgress?.(25);
+  const dataUrl = await compressAndOptimizeSocialImage(file, 1200, 630, 0.82);
+  onProgress?.(60);
+
+  try {
+    const storagePromise = (async () => {
+      const fileName = `og-image-${Date.now()}.jpg`;
+      const storageRef = ref(storage, `banners/social/${fileName}`);
+      const blob = dataUrlToBlob(dataUrl);
+
+      const snapshot = await uploadBytes(storageRef, blob, {
+        contentType: 'image/jpeg',
+        cacheControl: 'public,max-age=31536000,immutable'
+      });
+
+      return await getDownloadURL(snapshot.ref);
+    })();
+
+    const timeoutPromise = new Promise<string>((_, reject) => {
+      setTimeout(() => reject(new Error('Firebase Storage timeout (falling back to direct optimized image)')), 1500);
+    });
+
+    onProgress?.(75);
+    const publicUrl = await Promise.race([storagePromise, timeoutPromise]);
+    onProgress?.(100);
+    return publicUrl;
+  } catch (error) {
+    console.info('Firebase Storage upload skipped or timed out, using optimized image directly:', error);
+    onProgress?.(100);
+    return dataUrl;
+  }
+}

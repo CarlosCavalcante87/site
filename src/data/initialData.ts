@@ -361,6 +361,10 @@ export const INITIAL_SITE_CONFIG = {
   whatsappNumber: '5511999999999',
   whatsappDefaultMessage: 'Olá! Estava navegando no Ofertas do Dia e gostaria de tirar algumas dúvidas sobre as ofertas e promoções.',
   mobileDoubleColumns: true,
+  siteUrl: 'https://achados-cctech.vercel.app',
+  socialShareImage: 'https://achados-cctech.vercel.app/og-image.jpg',
+  socialShareTitle: 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
+  socialShareDescription: 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.',
   bottomCtaBanner: {
     isActive: true,
     badge: '🔍 Não encontrou o que procurava? Pedido 100% Gratuito!',

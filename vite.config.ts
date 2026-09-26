@@ -15,15 +15,15 @@ function socialCardsPlugin(): Plugin {
       };
       const rawUrl = anyCtx.originalUrl || anyCtx.path || '';
 
-      // Determine public base URL (prefer public preview ais-pre- over private auth ais-dev-)
+      // Determine public base URL (prefer Vercel production domain, then VERCEL_URL, then APP_URL, then live Vercel domain)
       let rawBaseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL 
         ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
         : (process.env.VERCEL_URL 
             ? `https://${process.env.VERCEL_URL}` 
-            : (process.env.APP_URL || 'https://ais-pre-u4snn7m472n36a6kgbkxnl-457784679767.us-east5.run.app'));
+            : (process.env.APP_URL || 'https://achados-cctech.vercel.app'));
 
       if (rawBaseUrl.includes('ais-dev-')) {
-        rawBaseUrl = rawBaseUrl.replace('ais-dev-', 'ais-pre-');
+        rawBaseUrl = 'https://achados-cctech.vercel.app';
       }
       const baseUrl = rawBaseUrl.replace(/\/+$/, '');
 

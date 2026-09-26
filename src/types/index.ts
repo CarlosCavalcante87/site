@@ -76,6 +76,10 @@ export interface SiteConfig {
   whatsappDefaultMessage: string;
   mobileDoubleColumns?: boolean;
   bottomCtaBanner?: BottomCtaBannerConfig;
+  siteUrl?: string;
+  socialShareImage?: string;
+  socialShareTitle?: string;
+  socialShareDescription?: string;
 }
 
 export type SortOption = 'latest' | 'popular' | 'featured' | 'title';

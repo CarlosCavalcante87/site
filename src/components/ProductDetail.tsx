@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Maximize2,
   Layers,
-  Facebook
+  Facebook,
+  Eye
 } from 'lucide-react';
 import { Product } from '../types';
 import { STORE_CONFIG, trackProductClick } from '../services/storage';
@@ -22,6 +23,7 @@ import { StoreLogo } from './StoreLogo';
 import { WhatsAppIcon } from './WhatsAppButton';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { getPublicBaseUrl } from '../utils/seo';
+import { SocialSharePreviewModal } from './SocialSharePreviewModal';
 
 interface ProductDetailProps {
   product: Product;
@@ -41,6 +43,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+  const [showSocialPreview, setShowSocialPreview] = useState(false);
 
   // Touch swipe support for photo gallery
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -262,6 +265,15 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSocialPreview(true)}
+                title="Simular visualização do card no WhatsApp e Facebook"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200/80 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-orange-600" />
+                <span>Testar Card</span>
               </button>
             </div>
           </div>
@@ -545,6 +557,14 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
           </div>
         </div>
       )}
+
+      {/* Social Share Preview Modal */}
+      <SocialSharePreviewModal
+        isOpen={showSocialPreview}
+        onClose={() => setShowSocialPreview(false)}
+        product={product}
+        onShowToast={onShowToast}
+      />
     </div>
   );
 };
