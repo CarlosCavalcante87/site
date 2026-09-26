@@ -1,7 +1,9 @@
 /**
- * SEO & Social Metadata Utility for Ofertas do Dia
- * Compliant with applet-seo skill and social crawlers (WhatsApp, Facebook, Twitter/X, Telegram)
+ * SEO & Social Metadata Utility for Achados do Dia
+ * Compliant with applet-seo skill and search crawlers (Googlebot, WhatsApp, Facebook, Twitter/X, Telegram)
  */
+
+import { Product } from '../types';
 
 interface SEOOptions {
   title?: string;
@@ -11,9 +13,9 @@ interface SEOOptions {
   type?: string;
 }
 
-const DEFAULT_TITLE = 'Ofertas do Dia - Melhores Ofertas e Promoções da Internet';
-const DEFAULT_DESCRIPTION = 'Agregador de ofertas e promoções das melhores lojas online. Encontre os produtos mais virais e recomendados com links diretos para compra.';
-const DEFAULT_IMAGE = '/og-image.jpg';
+export const DEFAULT_TITLE = 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet';
+export const DEFAULT_DESCRIPTION = 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.';
+export const DEFAULT_IMAGE = '/images/banner_achadinhos_virais_1790121462152.jpg';
 
 export function setMetaTag(name: string, content: string, isProperty: boolean = false) {
   if (typeof document === 'undefined') return;
@@ -57,7 +59,92 @@ export function toAbsoluteUrl(pathOrUrl: string): string {
   return `${origin}${cleanPath}`;
 }
 
-export function updatePageSEO(options: SEOOptions) {
+/**
+ * Updates dynamic JSON-LD structured data for Google Search rich snippets
+ */
+export function updateStructuredData(product?: Product | null) {
+  if (typeof document === 'undefined') return;
+
+  const scriptId = 'dynamic-json-ld';
+  let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+  if (!script) {
+    script = document.createElement('script');
+    script.id = scriptId;
+    script.type = 'application/ld+json';
+    document.head.appendChild(script);
+  }
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-ntmbpov2wv7232nhqojqk2-300468531200.us-east5.run.app';
+
+  if (product) {
+    // Rich Product Schema for Google Search Snippets (Price, Stock, Rating, Image)
+    const productSchema = {
+      '@context': 'https://schema.org/',
+      '@type': 'Product',
+      name: product.title,
+      image: (product.images || []).map((img) => toAbsoluteUrl(img)),
+      description: product.description || `Oferta especial de ${product.title} na loja oficial ${product.store}.`,
+      brand: {
+        '@type': 'Brand',
+        name: product.store || 'Loja Parceira Oficial',
+      },
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'BRL',
+        price: product.price,
+        itemCondition: 'https://schema.org/NewCondition',
+        availability: 'https://schema.org/InStock',
+        url: product.affiliateUrl || origin,
+        seller: {
+          '@type': 'Organization',
+          name: product.store,
+        },
+      },
+      ...(product.rating ? {
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: product.rating,
+          reviewCount: product.reviewCount || 15,
+          bestRating: 5,
+          worstRating: 1,
+        },
+      } : {}),
+    };
+    script.textContent = JSON.stringify(productSchema);
+  } else {
+    // WebSite + CollectionPage Schema for Homepage
+    const websiteSchema = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          '@id': `${origin}/#website`,
+          url: origin,
+          name: 'Achados do Dia',
+          alternateName: ['Achados do Dia - Melhores Ofertas e Promoções', 'Achadinhos Online'],
+          description: DEFAULT_DESCRIPTION,
+          inLanguage: 'pt-BR',
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: `${origin}/?q={search_term_string}`,
+            'query-input': 'required name=search_term_string',
+          },
+        },
+        {
+          '@type': 'CollectionPage',
+          '@id': `${origin}/#collection`,
+          url: origin,
+          name: DEFAULT_TITLE,
+          description: DEFAULT_DESCRIPTION,
+          inLanguage: 'pt-BR',
+        },
+      ],
+    };
+    script.textContent = JSON.stringify(websiteSchema);
+  }
+}
+
+export function updatePageSEO(options: SEOOptions, product?: Product | null) {
   if (typeof document === 'undefined') return;
 
   const title = options.title ? `${options.title}` : DEFAULT_TITLE;
@@ -77,8 +164,8 @@ export function updatePageSEO(options: SEOOptions) {
   // 3. OpenGraph / WhatsApp / Facebook
   setMetaTag('og:title', title, true);
   setMetaTag('og:description', description, true);
-  setMetaTag('og:type', options.type || 'website', true);
-  setMetaTag('og:site_name', 'Ofertas do Dia', true);
+  setMetaTag('og:type', options.type || (product ? 'product' : 'website'), true);
+  setMetaTag('og:site_name', 'Achados do Dia', true);
   setMetaTag('og:locale', 'pt_BR', true);
 
   if (currentUrl) {
@@ -111,4 +198,7 @@ export function updatePageSEO(options: SEOOptions) {
     setMetaTag('twitter:image', image);
     setMetaTag('twitter:image:alt', title);
   }
+
+  // 5. Update Dynamic Schema.org JSON-LD
+  updateStructuredData(product);
 }

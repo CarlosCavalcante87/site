@@ -120,14 +120,7 @@ export const getStoredProducts = (): Product[] => {
     }
     const parsed = JSON.parse(raw);
     const validArray = Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_PRODUCTS;
-    const withPrices = validArray.map((p: Product) => {
-      const initMatch = INITIAL_PRODUCTS.find((ip) => ip.id === p.id);
-      if (initMatch && p.price === undefined && initMatch.price !== undefined) {
-        return { ...p, price: initMatch.price, originalPrice: initMatch.originalPrice };
-      }
-      return p;
-    });
-    const normalized = normalizeProductOrders(withPrices);
+    const normalized = normalizeProductOrders(validArray);
     return normalized;
   } catch (error) {
     console.error('Failed to load products from localStorage', error);
@@ -200,6 +193,10 @@ export const getStoredSiteConfig = (): SiteConfig => {
     return {
       ...INITIAL_SITE_CONFIG,
       ...(parsed || {}),
+      bottomCtaBanner: {
+        ...INITIAL_SITE_CONFIG.bottomCtaBanner,
+        ...(parsed?.bottomCtaBanner || {}),
+      },
     };
   } catch (error) {
     console.error('Failed to load site config from localStorage', error);
@@ -310,6 +307,13 @@ export const updateProduct = (id: string, updates: Partial<Product>): Product | 
     ...updates,
     updatedAt: new Date().toISOString(),
   };
+
+  if ('price' in updates && (updates.price === undefined || updates.price === null)) {
+    delete updatedProduct.price;
+  }
+  if ('originalPrice' in updates && (updates.originalPrice === undefined || updates.originalPrice === null)) {
+    delete updatedProduct.originalPrice;
+  }
 
   current[index] = updatedProduct;
   const normalized = normalizeProductOrders(current);

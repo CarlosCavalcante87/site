@@ -48,6 +48,9 @@ import {
   Printer,
   Headphones,
   Tv,
+  Users,
+  Gift,
+  MessageSquare,
   Zap,
   Plug,
   Wrench,
@@ -152,7 +155,7 @@ export const renderCategoryIcon = (iconName?: string, className = 'w-4 h-4') => 
   }
   return <Package className={className} />;
 };
-import { Category, Product, StoreType, Banner, SiteConfig } from '../types';
+import { Category, Product, StoreType, Banner, SiteConfig, BottomCtaBannerConfig } from '../types';
 import { 
   addProduct, 
   updateProduct, 
@@ -189,6 +192,7 @@ import {
   saveCategoriesToCloud,
   deleteCategoryFromCloud,
   saveSiteConfigToCloud,
+  subscribeToSiteConfig,
   fetchAdminAuthFromCloud,
   saveAdminAuthToCloud,
   subscribeToAdminAuth,
@@ -439,6 +443,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => getStoredSiteConfig());
 
+  useEffect(() => {
+    const unsub = subscribeToSiteConfig((cloudConfig) => {
+      if (cloudConfig) {
+        setSiteConfig(cloudConfig);
+      }
+    });
+    return () => unsub();
+  }, []);
+
   // Password Change Form State
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -465,6 +478,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     originalPrice: '' as string | number,
     price: '' as string | number,
     isFeatured: true,
+    isCollection: false,
+    collectionButtonText: '',
     rating: 4.9,
     reviewCount: 384,
     clicksCount: 1420,
@@ -1078,6 +1093,89 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onShowToast('Configurações do WhatsApp salvas com sucesso!');
   };
 
+  // Handle Bottom CTA Banner Updates
+  const handleSaveBottomCtaConfig = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    saveStoredSiteConfig(siteConfig);
+    saveSiteConfigToCloud(siteConfig);
+    onShowToast('Configurações do Banner de Chamada salvas com sucesso!');
+  };
+
+  const handleToggleBottomCtaActive = (isActive: boolean) => {
+    const currentCta = siteConfig.bottomCtaBanner || {
+      badge: '🔍 Não encontrou o que procurava? Pedido 100% Gratuito!',
+      title: 'Quer que a gente encontre um produto ou oferta específica para você?',
+      description: 'Se você precisa de qualquer equipamento, acessório ou achadinho confiável que não está na lista, fale conosco! Nós garimpamos o menor preço oficial com cupom e segurança pra você, sem nenhum custo.',
+      buttonText: 'Pedir Oferta sem Custo no WhatsApp',
+      secondaryButtonText: 'Entrar no Grupo VIP de Ofertas',
+      linkType: 'whatsapp_direct',
+      targetUrl: '',
+      whatsappMessage: 'Olá! Estava navegando no site e gostaria de pedir ajuda para encontrar uma oferta/produto confiável:',
+    };
+    const updated = {
+      ...siteConfig,
+      bottomCtaBanner: {
+        ...currentCta,
+        isActive,
+      },
+    };
+    setSiteConfig(updated);
+    saveStoredSiteConfig(updated);
+    saveSiteConfigToCloud(updated);
+    onShowToast(isActive ? 'Banner de chamada especial ativado no site!' : 'Banner de chamada especial desativado!');
+  };
+
+  const applyBottomCtaPreset = (preset: 'product_request' | 'vip_group' | 'hybrid') => {
+    const current = siteConfig.bottomCtaBanner;
+    let updatedCta: BottomCtaBannerConfig;
+    if (preset === 'product_request') {
+      updatedCta = {
+        isActive: true,
+        badge: '🔍 Não encontrou o que procurava? Pedido 100% Gratuito!',
+        title: 'Quer que a gente encontre um produto ou oferta específica para você?',
+        description: 'Se você precisa de qualquer equipamento, acessório ou produto confiável que não está no site, peça pra gente! Nós garimpamos a melhor oferta com vendedor verificado e cupom de desconto pra você, 100% sem custos.',
+        buttonText: 'Pedir Oferta sem Custo no WhatsApp',
+        secondaryButtonText: '',
+        linkType: 'whatsapp_direct',
+        targetUrl: current?.targetUrl || '',
+        whatsappMessage: 'Olá! Estava navegando no Ofertas do Dia e gostaria de pedir ajuda para encontrar uma oferta/produto confiável:',
+      };
+    } else if (preset === 'vip_group') {
+      updatedCta = {
+        isActive: true,
+        badge: '🔥 Grupo VIP de Achadinhos & Promoções Exclusivas',
+        title: 'Receba primeiro as melhores ofertas antes de esgotar!',
+        description: 'Entre no nosso grupo oficial do WhatsApp e tenha acesso instantâneo a cupons secretos, promoções relâmpago, produtos com frete grátis e novidades garimpadas diariamente.',
+        buttonText: 'Entrar no Grupo VIP do WhatsApp',
+        secondaryButtonText: 'Pedir Produto no Privado',
+        linkType: 'whatsapp_group',
+        targetUrl: current?.targetUrl || '',
+        whatsappMessage: 'Olá! Gostaria de saber mais sobre o Grupo VIP de Achadinhos.',
+      };
+    } else {
+      updatedCta = {
+        isActive: true,
+        badge: '✨ Atendimento Especial & Grupo VIP',
+        title: 'Procurando outro produto ou quer entrar no nosso Grupo VIP?',
+        description: 'Nós pesquisamos qualquer equipamento ou achadinho confiável para você sem nenhum custo, ou você pode entrar na nossa comunidade oficial para receber ofertas diárias com cupons.',
+        buttonText: 'Pedir Oferta sem Custo no WhatsApp',
+        secondaryButtonText: 'Entrar no Grupo VIP de Ofertas',
+        linkType: 'hybrid',
+        targetUrl: current?.targetUrl || '',
+        whatsappMessage: 'Olá! Estava navegando no site e gostaria de pedir ajuda para encontrar uma oferta/produto confiável:',
+      };
+    }
+
+    const updated = {
+      ...siteConfig,
+      bottomCtaBanner: updatedCta,
+    };
+    setSiteConfig(updated);
+    saveStoredSiteConfig(updated);
+    saveSiteConfigToCloud(updated);
+    onShowToast('Modelo de banner aplicado com sucesso!');
+  };
+
   const resetForm = () => {
     setEditingProductId(null);
     const nextOrder = products.reduce((max, p) => Math.max(max, p.order || 0), 0) + 1;
@@ -1094,6 +1192,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       originalPrice: '',
       price: '',
       isFeatured: true,
+      isCollection: false,
+      collectionButtonText: '',
       rating: 4.9,
       reviewCount: 384,
       clicksCount: 1420,
@@ -1116,6 +1216,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       originalPrice: p.originalPrice !== undefined ? p.originalPrice : '',
       price: p.price !== undefined ? p.price : '',
       isFeatured: !!p.isFeatured,
+      isCollection: !!p.isCollection,
+      collectionButtonText: p.collectionButtonText || '',
       rating: p.rating !== undefined ? p.rating : 4.9,
       reviewCount: p.reviewCount !== undefined ? p.reviewCount : 384,
       clicksCount: p.clicksCount !== undefined ? p.clicksCount : 1420,
@@ -1202,17 +1304,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         highlights: cleanHighlights,
         badges: formData.badges,
         isFeatured: formData.isFeatured,
+        isCollection: formData.isCollection,
+        collectionButtonText: formData.collectionButtonText.trim() || undefined,
         rating: Number(formData.rating) || 4.9,
         reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
         clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
       };
 
-      if (parsedOriginalPrice !== undefined) {
-        updates.originalPrice = parsedOriginalPrice;
-      }
-      if (parsedPrice !== undefined) {
-        updates.price = parsedPrice;
-      }
+      updates.originalPrice = parsedOriginalPrice;
+      updates.price = parsedPrice;
       if (updatedHistory.length > 0) {
         updates.priceHistory = updatedHistory;
       } else if (existingProduct?.priceHistory) {
@@ -1239,6 +1339,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         highlights: cleanHighlights.length > 0 ? cleanHighlights : ['Produto verificado', 'Envio rápido'],
         badges: formData.badges,
         isFeatured: formData.isFeatured,
+        isCollection: formData.isCollection,
+        collectionButtonText: formData.collectionButtonText.trim() || undefined,
         rating: Number(formData.rating) || 4.9,
         reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
         clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
@@ -2331,7 +2433,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Segurança & Backup</span>
+            <span>Segurança</span>
           </button>
         </div>
       </div>
@@ -2914,6 +3016,346 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Banner de Chamada Especial no Rodapé (Grupo VIP / Pedido de Oferta sem Custo) */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-6 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
+                  <Gift className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Banner de Chamada no Rodapé (Grupo VIP / Pedidos sem Custo)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Aparece logo abaixo do último card e acima do rodapé. Estimula o cliente a pedir links de produtos confiáveis e/ou entrar no grupo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Ativar / Desativar Toggle */}
+              <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200 w-fit shrink-0">
+                <span className="text-xs font-bold text-slate-700">
+                  {siteConfig.bottomCtaBanner?.isActive !== false ? '● Banner Ativo' : '○ Banner Desativado'}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={siteConfig.bottomCtaBanner?.isActive !== false}
+                    onChange={(e) => handleToggleBottomCtaActive(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {/* Quick Presets Buttons */}
+            <div className="mb-6 p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/60">
+              <span className="text-xs font-bold text-emerald-950 block mb-2">
+                ⚡ Modelos Prontos de Chamada (Clique para preencher automaticamente):
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => applyBottomCtaPreset('product_request')}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-100/70 border border-emerald-200 text-left transition-all cursor-pointer shadow-2xs group"
+                >
+                  <span className="text-xs font-bold text-slate-900 block group-hover:text-emerald-800">
+                    🔍 Foco em Pedido sem Custo
+                  </span>
+                  <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                    Cliente pede link de produto que não achou no site.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applyBottomCtaPreset('vip_group')}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-100/70 border border-emerald-200 text-left transition-all cursor-pointer shadow-2xs group"
+                >
+                  <span className="text-xs font-bold text-slate-900 block group-hover:text-emerald-800">
+                    👥 Foco em Grupo VIP
+                  </span>
+                  <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                    Convite para comunidade de ofertas diárias.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applyBottomCtaPreset('hybrid')}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-100/70 border border-emerald-200 text-left transition-all cursor-pointer shadow-2xs group"
+                >
+                  <span className="text-xs font-bold text-slate-900 block group-hover:text-emerald-800">
+                    ✨ Modelo Híbrido (Ambos)
+                  </span>
+                  <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                    Botão de pedido + botão para entrar no grupo VIP.
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Customization Form */}
+            <form onSubmit={handleSaveBottomCtaConfig} className="space-y-4 max-w-2xl">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Etiqueta / Badge do Topo
+                </label>
+                <input
+                  type="text"
+                  value={siteConfig.bottomCtaBanner?.badge || ''}
+                  onChange={(e) =>
+                    setSiteConfig({
+                      ...siteConfig,
+                      bottomCtaBanner: {
+                        ...(siteConfig.bottomCtaBanner || {
+                          isActive: true,
+                          title: '',
+                          description: '',
+                          buttonText: '',
+                          linkType: 'whatsapp_direct',
+                          targetUrl: '',
+                        }),
+                        badge: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Ex: 🔍 Não encontrou o que procurava? Pedido 100% Gratuito!"
+                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Título Principal do Banner *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={siteConfig.bottomCtaBanner?.title || ''}
+                  onChange={(e) =>
+                    setSiteConfig({
+                      ...siteConfig,
+                      bottomCtaBanner: {
+                        ...(siteConfig.bottomCtaBanner || {
+                          isActive: true,
+                          description: '',
+                          buttonText: '',
+                          linkType: 'whatsapp_direct',
+                          targetUrl: '',
+                        }),
+                        title: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Ex: Quer que a gente encontre um produto ou oferta específica para você?"
+                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Texto de Apoio / Descrição *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={siteConfig.bottomCtaBanner?.description || ''}
+                  onChange={(e) =>
+                    setSiteConfig({
+                      ...siteConfig,
+                      bottomCtaBanner: {
+                        ...(siteConfig.bottomCtaBanner || {
+                          isActive: true,
+                          title: '',
+                          buttonText: '',
+                          linkType: 'whatsapp_direct',
+                          targetUrl: '',
+                        }),
+                        description: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Ex: Se você precisa de qualquer equipamento, acessório ou achadinho confiável que não está na lista, fale conosco! Nós garimpamos o menor preço oficial com cupom e segurança pra você, sem nenhum custo."
+                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 leading-relaxed"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Tipo de Ação / Destino
+                  </label>
+                  <select
+                    value={siteConfig.bottomCtaBanner?.linkType || 'whatsapp_direct'}
+                    onChange={(e) =>
+                      setSiteConfig({
+                        ...siteConfig,
+                        bottomCtaBanner: {
+                          ...(siteConfig.bottomCtaBanner || {
+                            isActive: true,
+                            title: '',
+                            description: '',
+                            buttonText: '',
+                            targetUrl: '',
+                          }),
+                          linkType: e.target.value as any,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
+                  >
+                    <option value="whatsapp_direct">💬 Conversa Direta no WhatsApp (Pedido sem Custo)</option>
+                    <option value="whatsapp_group">👥 Link de Grupo VIP do WhatsApp</option>
+                    <option value="hybrid">✨ Híbrido (Pedido no WhatsApp + Botão para Grupo)</option>
+                    <option value="custom_url">🔗 Link Externo Personalizado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Texto do Botão Principal
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={siteConfig.bottomCtaBanner?.buttonText || ''}
+                    onChange={(e) =>
+                      setSiteConfig({
+                        ...siteConfig,
+                        bottomCtaBanner: {
+                          ...(siteConfig.bottomCtaBanner || {
+                            isActive: true,
+                            title: '',
+                            description: '',
+                            linkType: 'whatsapp_direct',
+                            targetUrl: '',
+                          }),
+                          buttonText: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Ex: Pedir Oferta sem Custo no WhatsApp"
+                    className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Campo para Link de Grupo ou URL Personalizada */}
+              {(siteConfig.bottomCtaBanner?.linkType === 'whatsapp_group' || 
+                siteConfig.bottomCtaBanner?.linkType === 'hybrid' || 
+                siteConfig.bottomCtaBanner?.linkType === 'custom_url') && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Link do Grupo do WhatsApp ou URL Externa
+                    </label>
+                    <input
+                      type="url"
+                      value={siteConfig.bottomCtaBanner?.targetUrl || ''}
+                      onChange={(e) =>
+                        setSiteConfig({
+                          ...siteConfig,
+                          bottomCtaBanner: {
+                            ...(siteConfig.bottomCtaBanner || {
+                              isActive: true,
+                              title: '',
+                              description: '',
+                              buttonText: '',
+                              linkType: 'whatsapp_group',
+                            }),
+                            targetUrl: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Ex: https://chat.whatsapp.com/ExemploDoSeuGrupo"
+                      className="w-full px-4 py-2 bg-white rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Cole aqui o link de convite do seu grupo de ofertas no WhatsApp (ex: https://chat.whatsapp.com/...).
+                    </p>
+                  </div>
+
+                  {siteConfig.bottomCtaBanner?.linkType === 'hybrid' && (
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Texto do Botão Secundário (para entrar no grupo)
+                      </label>
+                      <input
+                        type="text"
+                        value={siteConfig.bottomCtaBanner?.secondaryButtonText || ''}
+                        onChange={(e) =>
+                          setSiteConfig({
+                            ...siteConfig,
+                            bottomCtaBanner: {
+                              ...(siteConfig.bottomCtaBanner || {
+                                isActive: true,
+                                title: '',
+                                description: '',
+                                buttonText: '',
+                                linkType: 'hybrid',
+                                targetUrl: '',
+                              }),
+                              secondaryButtonText: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="Ex: Entrar no Grupo VIP de Ofertas"
+                        className="w-full px-4 py-2 bg-white rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mensagem Inicial para Pedidos Diretos no WhatsApp */}
+              {(siteConfig.bottomCtaBanner?.linkType === 'whatsapp_direct' || siteConfig.bottomCtaBanner?.linkType === 'hybrid') && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Mensagem Inicial Automática ao Clicar no WhatsApp
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={siteConfig.bottomCtaBanner?.whatsappMessage || ''}
+                    onChange={(e) =>
+                      setSiteConfig({
+                        ...siteConfig,
+                        bottomCtaBanner: {
+                          ...(siteConfig.bottomCtaBanner || {
+                            isActive: true,
+                            title: '',
+                            description: '',
+                            buttonText: '',
+                            linkType: 'whatsapp_direct',
+                            targetUrl: '',
+                          }),
+                          whatsappMessage: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Olá! Estava navegando no Ofertas do Dia e gostaria de pedir ajuda para encontrar uma oferta/produto confiável:"
+                    className="w-full px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    O WhatsApp do cliente abrirá com este texto já pronto, bastando ele digitar o nome do produto desejado.
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md shadow-emerald-600/20"
+                >
+                  <Check className="w-4 h-4 text-emerald-200" />
+                  <span>Salvar Configuração do Banner de Chamada</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -2985,7 +3427,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <h4 className="font-bold text-xs text-slate-900 line-clamp-2 leading-snug">
                             {p.title}
                           </h4>
+                          {(p.price != null || p.originalPrice != null) && (
+                            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5 leading-tight">
+                              💰 {p.originalPrice != null && <span className="line-through text-slate-400 mr-1">De R$ {p.originalPrice.toFixed(2).replace('.', ',')}</span>}
+                              {p.price != null && <span>{p.originalPrice != null ? 'por ' : ''}R$ {p.price.toFixed(2).replace('.', ',')}</span>}
+                            </p>
+                          )}
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {p.isCollection && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-extrabold text-[10px] bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                📁 Coleção
+                              </span>
+                            )}
                             <span
                               style={{
                                 backgroundColor: storeConf.bg,
@@ -3124,11 +3577,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
                               />
                               <div className="max-w-xs">
-                                <p className="font-bold text-slate-900 line-clamp-1">{p.title}</p>
-                                {p.price != null && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="font-bold text-slate-900 line-clamp-1">{p.title}</p>
+                                  {p.isCollection && (
+                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                      📁 Coleção
+                                    </span>
+                                  )}
+                                </div>
+                                {(p.price != null || p.originalPrice != null) && (
                                   <span className="text-[11px] text-emerald-600 font-semibold block leading-tight">
                                     💰 {p.originalPrice != null && <span className="line-through text-slate-400 mr-1">De R$ {p.originalPrice.toFixed(2).replace('.', ',')}</span>}
-                                    por R$ {p.price.toFixed(2).replace('.', ',')}
+                                    {p.price != null && <span>{p.originalPrice != null ? 'por ' : ''}R$ {p.price.toFixed(2).replace('.', ',')}</span>}
                                   </span>
                                 )}
                                 <a
@@ -3402,9 +3862,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {/* Campos de Preço Promocional (Opcionais) */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                💰 Preço Anterior (De R$)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  💰 Preço Anterior (De R$)
+                </label>
+                {formData.originalPrice !== '' && formData.originalPrice !== undefined && formData.originalPrice !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, originalPrice: '' })}
+                    className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                  >
+                    Esvaziar
+                  </button>
+                )}
+              </div>
               <input
                 type="number"
                 step="0.01"
@@ -3415,14 +3886,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                Opcional. Exibe tachado no card: <span className="line-through">De R$ 129,90</span>
+                Opcional. Exibe tachado no card. Deixe vazio para remover/não exibir.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                🏷️ Preço Promocional (Por R$)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  🏷️ Preço Promocional (Por R$)
+                </label>
+                {formData.price !== '' && formData.price !== undefined && formData.price !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, price: '' })}
+                    className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                  >
+                    Esvaziar
+                  </button>
+                )}
+              </div>
               <input
                 type="number"
                 step="0.01"
@@ -3433,7 +3915,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-semibold text-emerald-600"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                Opcional. Exibe em destaque verde: <span className="text-emerald-600 font-bold">por R$ 89,90</span>
+                Opcional. Exibe em destaque verde. Deixe vazio para remover/não exibir.
               </p>
             </div>
 
@@ -3656,6 +4138,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <label htmlFor="isFeaturedSwitch" className="text-xs font-bold text-slate-800 cursor-pointer">
                 Exibir este achadinho com destaque prioritário na página inicial
               </label>
+            </div>
+
+            {/* Campo de Coleção / Vitrine de Recomendações */}
+            <div className="md:col-span-2 p-4 bg-indigo-50/60 rounded-2xl border border-indigo-200/80 space-y-3">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="isCollectionSwitch"
+                  checked={formData.isCollection}
+                  onChange={(e) => setFormData({ ...formData, isCollection: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 rounded cursor-pointer mt-0.5"
+                />
+                <label htmlFor="isCollectionSwitch" className="text-xs font-bold text-indigo-950 cursor-pointer select-none">
+                  📁 Este card é uma Lista / Coleção de Recomendações (link direto sem tela intermediária)
+                  <span className="block font-normal text-[11px] text-indigo-800/80 mt-0.5">
+                    Ideal para indicar vitrines completas (ex: Acessórios para Informática, Cozinha, Ferramentas). Ao clicar no card, o visitante é direcionado diretamente para sua lista externa de recomendações, sem passar pela página de produto único.
+                  </span>
+                </label>
+              </div>
+
+              {formData.isCollection && (
+                <div className="pt-2.5 border-t border-indigo-200/60 pl-7 space-y-1.5">
+                  <label className="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider">
+                    Texto do Botão de Ação Direta (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.collectionButtonText}
+                    onChange={(e) => setFormData({ ...formData, collectionButtonText: e.target.value })}
+                    placeholder="Ex: Explorar Vitrine de Informática (padrão: Explorar Lista de Recomendações)"
+                    className="w-full px-3.5 py-2 bg-white rounded-xl border border-indigo-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
+                  />
+                  <p className="text-[10px] text-indigo-700/80">
+                    O card exibirá um botão largo único e elegante em destaque, em vez dos botões divididos de produto avulso.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

@@ -361,5 +361,16 @@ export const INITIAL_SITE_CONFIG = {
   whatsappNumber: '5511999999999',
   whatsappDefaultMessage: 'Olá! Estava navegando no Ofertas do Dia e gostaria de tirar algumas dúvidas sobre as ofertas e promoções.',
   mobileDoubleColumns: true,
+  bottomCtaBanner: {
+    isActive: true,
+    badge: '🔍 Não encontrou o que procurava? Pedido 100% Gratuito!',
+    title: 'Quer que a gente encontre um produto ou oferta específica para você?',
+    description: 'Se você precisa de qualquer equipamento, acessório ou achadinho confiável que não está na lista, fale conosco! Nós garimpamos o menor preço oficial com cupom e segurança pra você, sem nenhum custo.',
+    buttonText: 'Pedir Oferta sem Custo no WhatsApp',
+    secondaryButtonText: 'Entrar no Grupo VIP de Ofertas',
+    linkType: 'whatsapp_direct' as const,
+    targetUrl: '',
+    whatsappMessage: 'Olá! Estava navegando no site e gostaria de pedir ajuda para encontrar uma oferta/produto confiável:',
+  },
 };
 

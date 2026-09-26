@@ -27,6 +27,8 @@ export interface Product {
   realClicksCount?: number;
   realViewsCount?: number;
   clicksCount: number;
+  isCollection?: boolean;
+  collectionButtonText?: string;
   rating?: number;
   reviewCount?: number;
   createdAt: string;
@@ -57,10 +59,23 @@ export interface Banner {
   order?: number;
 }
 
+export interface BottomCtaBannerConfig {
+  isActive: boolean;
+  badge?: string;
+  title: string;
+  description: string;
+  buttonText: string;
+  secondaryButtonText?: string;
+  linkType: 'whatsapp_direct' | 'whatsapp_group' | 'hybrid' | 'custom_url';
+  targetUrl?: string;
+  whatsappMessage?: string;
+}
+
 export interface SiteConfig {
   whatsappNumber: string;
   whatsappDefaultMessage: string;
   mobileDoubleColumns?: boolean;
+  bottomCtaBanner?: BottomCtaBannerConfig;
 }
 
 export type SortOption = 'latest' | 'popular' | 'featured' | 'title';

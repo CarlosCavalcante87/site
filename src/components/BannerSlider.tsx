@@ -108,7 +108,10 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
         <div className="absolute inset-0 w-full h-full">
           <img
             src={currentBanner.imageUrl}
-            alt={currentBanner.title || 'Banner promocional'}
+            alt={currentBanner.title || 'Achados do Dia - Melhores Ofertas e Promoções'}
+            loading={currentIndex === 0 ? 'eager' : 'lazy'}
+            fetchPriority={currentIndex === 0 ? 'high' : 'auto'}
+            decoding="async"
             className="w-full h-full object-cover object-center transition-all duration-700"
             referrerPolicy="no-referrer"
             onError={(e) => {

@@ -11,7 +11,8 @@ import {
   Sparkles, 
   Flame, 
   ChevronRight,
-  Maximize2
+  Maximize2,
+  Layers
 } from 'lucide-react';
 import { Product } from '../types';
 import { STORE_CONFIG, trackProductClick } from '../services/storage';
@@ -254,6 +255,12 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
           <div>
             {/* Badges row */}
             <div className="flex flex-wrap items-center gap-2 mb-3">
+              {product.isCollection && (
+                <span className="px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xs flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-white" />
+                  Vitrine / Coleção
+                </span>
+              )}
               <span className="px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-orange-100 text-orange-800">
                 {product.category}
               </span>
@@ -385,17 +392,21 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               {/* Main Outbound Button */}
               <button
                 onClick={handleOpenPartnerLink}
-                className="w-full py-3.5 sm:py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 transition-all transform active:scale-98 cursor-pointer flex items-center justify-center gap-3 text-center"
+                className={`w-full py-3.5 sm:py-4 px-6 rounded-2xl ${
+                  product.isCollection
+                    ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-indigo-500/25'
+                    : 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/25'
+                } text-white transition-all transform active:scale-98 cursor-pointer flex items-center justify-center gap-3 text-center`}
               >
                 <div className="flex flex-col items-center justify-center leading-snug">
-                  <span className="font-bold text-xs sm:text-sm text-orange-100">
-                    ⏳ Ver Oferta (Expira Hoje)
+                  <span className="font-bold text-xs sm:text-sm text-amber-100">
+                    {product.isCollection ? '📁 Vitrine de Recomendações' : '⏳ Ver Oferta (Expira Hoje)'}
                   </span>
-                  {product.store && (
-                    <span className="font-extrabold text-base sm:text-lg text-white tracking-wide">
-                      {product.store}
-                    </span>
-                  )}
+                  <span className="font-extrabold text-base sm:text-lg text-white tracking-wide">
+                    {product.isCollection
+                      ? (product.collectionButtonText || `Explorar em ${product.store}`)
+                      : (product.store || 'Ir à Loja Parceira')}
+                  </span>
                 </div>
                 <ExternalLink className="w-5 h-5 shrink-0 text-white" />
               </button>

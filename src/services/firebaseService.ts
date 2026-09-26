@@ -8,7 +8,8 @@ import {
   deleteDoc, 
   onSnapshot,
   increment,
-  getDocFromServer
+  getDocFromServer,
+  deleteField
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Product, Category, Banner, SiteConfig } from '../types';
@@ -101,7 +102,12 @@ export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Par
   const clean: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) {
-      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        (value.constructor === Object || Object.getPrototypeOf(value) === null)
+      ) {
         clean[key] = sanitizeForFirestore(value);
       } else {
         clean[key] = value;
@@ -326,11 +332,24 @@ export async function updateProductInCloud(id: string, updates: Partial<Product>
   const index = current.findIndex((p) => p.id === id);
   if (index !== -1) {
     current[index] = { ...current[index], ...updates };
+    if ('price' in updates && (updates.price === undefined || updates.price === null)) {
+      delete current[index].price;
+    }
+    if ('originalPrice' in updates && (updates.originalPrice === undefined || updates.originalPrice === null)) {
+      delete current[index].originalPrice;
+    }
     saveLocalProducts(normalizeProductOrders(current));
   }
 
   try {
-    const cleanUpdates = sanitizeForFirestore(updates);
+    const firestoreUpdates: Record<string, any> = { ...updates };
+    if ('price' in updates && (updates.price === undefined || updates.price === null)) {
+      firestoreUpdates.price = deleteField();
+    }
+    if ('originalPrice' in updates && (updates.originalPrice === undefined || updates.originalPrice === null)) {
+      firestoreUpdates.originalPrice = deleteField();
+    }
+    const cleanUpdates = sanitizeForFirestore(firestoreUpdates);
     await updateDoc(doc(db, PRODUCTS_COL, id), cleanUpdates);
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${id}`);
