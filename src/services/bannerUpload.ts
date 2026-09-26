@@ -237,6 +237,17 @@ export async function uploadSocialShareImage(
   const dataUrl = await compressAndOptimizeSocialImage(file, 1200, 630, 0.82);
   onProgress?.(60);
 
+  // Save physically to public/og-image.jpg and public/images/og-image.jpg with fixed name
+  try {
+    await fetch('/api/save-og-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: dataUrl }),
+    });
+  } catch (err) {
+    console.warn('Local endpoint save-og-image note:', err);
+  }
+
   try {
     const storagePromise = (async () => {
       const fileName = `og-image-${Date.now()}.jpg`;

@@ -435,7 +435,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   }, []);
 
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'products' | 'new-product' | 'banners' | 'categories' | 'stats' | 'security' | 'backup'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'new-product' | 'banners' | 'social' | 'categories' | 'stats' | 'security' | 'backup'>('products');
   const [searchAdmin, setSearchAdmin] = useState('');
   const [showSocialModal, setShowSocialModal] = useState(false);
   
@@ -1193,6 +1193,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     saveStoredSiteConfig(updated);
     saveSiteConfigToCloud(updated);
     onShowToast('Imagem padrão de SEO restaurada com sucesso!');
+  };
+
+  const handleDownloadOgImage = () => {
+    const targetUrl = siteConfig.socialShareImage || 'https://achados-cctech.vercel.app/og-image.jpg';
+    const link = document.createElement('a');
+    link.href = targetUrl;
+    link.download = 'og-image.jpg';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    onShowToast('Iniciando download do arquivo og-image.jpg...');
   };
 
   const handleToggleBottomCtaActive = (isActive: boolean) => {
@@ -2531,12 +2543,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('social')}
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+              activeTab === 'social'
+                ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/25 ring-2 ring-emerald-500/20'
+                : 'text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 hover:text-emerald-900 shadow-2xs'
+            }`}
+            title="Aba oficial para configurar a imagem de SEO, WhatsApp, Facebook e testar o Card Social"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Card Social & SEO</span>
+          </button>
+
+          <button
             type="button"
-            onClick={() => setShowSocialModal(true)}
-            className="shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 cursor-pointer bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 shadow-xs hover:-translate-y-0.5 active:translate-y-0"
+            onClick={() => {
+              setActiveTab('social');
+              setShowSocialModal(true);
+            }}
+            className="shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 cursor-pointer bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-emerald-700 hover:border-emerald-300 shadow-2xs hover:-translate-y-0.5 active:translate-y-0"
             title="Simular e testar como o link do site aparece no WhatsApp e Facebook"
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="w-3.5 h-3.5 text-emerald-600" />
             <span>Testar Card Social</span>
           </button>
         </div>
@@ -3461,19 +3489,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </form>
           </div>
 
-          {/* SECTION: Social Share Image & OpenGraph Meta (WhatsApp / Facebook) */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold shrink-0">
-                  <Share2 className="w-5 h-5" />
+          {/* Shortcut to Card Social & SEO tab */}
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-white rounded-3xl border border-emerald-200/80 p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm shadow-emerald-600/20">
+                <Share2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-slate-900">
+                  Card Social & Imagem de Capa (WhatsApp / Facebook)
+                </h4>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Acesse a aba <strong>Card Social & SEO</strong> para alterar a foto de capa salva em <code>public/images/og-image.jpg</code> e simular como ela aparece nas redes sociais.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveTab('social')}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Abrir Aba Card Social</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('social');
+                  setShowSocialModal(true);
+                }}
+                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <Eye className="w-4 h-4 text-emerald-600" />
+                <span>Testar Card</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: CARD SOCIAL & SEO (Dedicated tab requested by user) */}
+      {activeTab === 'social' && (
+        <div className="space-y-6">
+          {/* Information & Technical Specs Box */}
+          <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-white rounded-3xl border border-emerald-200/80 p-6 sm:p-8 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 shadow-md shadow-emerald-600/20">
+                  <Share2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    Imagem de Compartilhamento Social (WhatsApp, Facebook & SEO)
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                    Card Social, Imagem de Capa e WhatsApp (SEO)
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Defina a foto de capa oficial (og:image), o domínio e os textos que aparecem ao compartilhar o link do seu site.
+                  <p className="text-xs text-slate-600">
+                    Configure a imagem oficial exibida pelo WhatsApp, Facebook, Instagram e Google ao compartilhar o link da sua loja.
                   </p>
                 </div>
               </div>
@@ -3482,31 +3553,85 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowSocialModal(true)}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-emerald-600/20 hover:-translate-y-0.5"
                 >
-                  <Eye className="w-4 h-4 text-emerald-600" />
-                  <span>Ver Simulador do Card</span>
+                  <Eye className="w-4 h-4" />
+                  <span>Testar Card Social (Simulador)</span>
                 </button>
                 <a
                   href={`https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(siteConfig.siteUrl || 'https://achados-cctech.vercel.app/')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3.5 py-2 rounded-xl bg-[#1877F2]/10 hover:bg-[#1877F2]/20 text-[#1877F2] text-xs font-bold border border-[#1877F2]/30 flex items-center gap-1.5 transition-colors no-underline shrink-0"
+                  className="px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-bold flex items-center gap-1.5 transition-all no-underline shadow-xs hover:-translate-y-0.5"
                 >
-                  <Facebook className="w-3.5 h-3.5 fill-current" />
+                  <Facebook className="w-4 h-4 fill-current" />
                   <span>Facebook Debugger</span>
                 </a>
               </div>
             </div>
 
-            <form onSubmit={handleSaveSocialConfig} className="space-y-6 max-w-3xl">
+            {/* Path & Fixed Name Spec Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 pt-2">
+              <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-200/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block mb-1">
+                  📁 Pasta & Nome Fixo
+                </span>
+                <span className="text-xs font-extrabold text-slate-900 font-mono block truncate">
+                  public/images/og-image.jpg
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Salvo automaticamente com nome fixo para o Vercel.
+                </p>
+              </div>
+
+              <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-200/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block mb-1">
+                  📐 Dimensão Oficial
+                </span>
+                <span className="text-sm font-extrabold text-slate-900 font-mono">
+                  1200 x 630 px
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Proporção exata 1.91:1 recomendada pelo Facebook e WhatsApp.
+                </p>
+              </div>
+
+              <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-200/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block mb-1">
+                  ⚡ Peso Máximo
+                </span>
+                <span className="text-sm font-extrabold text-slate-900 font-mono">
+                  Menos de 200 KB
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Comprimido automaticamente para o WhatsApp não descartar.
+                </p>
+              </div>
+
+              <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-200/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block mb-1">
+                  🌐 Link Direto Oficial
+                </span>
+                <span className="text-[11px] font-bold text-slate-900 font-mono block truncate">
+                  /og-image.jpg
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Acessível em https://achados-cctech.vercel.app/og-image.jpg.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Form & Controls Card */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+            <form onSubmit={handleSaveSocialConfig} className="space-y-6 max-w-4xl">
               {/* Image Preview & Upload Row */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                 {/* Visual Preview Box */}
                 <div className="md:col-span-5 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Prévia da Imagem Atual
+                      Prévia do Card Social
                     </label>
                     <button
                       type="button"
@@ -3535,46 +3660,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                   
                   {/* Action buttons directly below preview */}
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
                       type="button"
                       disabled={isUploadingSocialImg}
                       onClick={() => socialFileInputRef.current?.click()}
-                      className="flex-1 py-2 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      className="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      <span>Inserir Imagem (Arquivo)</span>
+                      <span>Trocar Imagem</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowSocialModal(true)}
-                      className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer border border-slate-200"
+                      onClick={handleDownloadOgImage}
+                      className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+                      title="Baixar a imagem og-image.jpg otimizada para o seu computador"
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Simular</span>
+                      <Download className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Baixar Arquivo</span>
                     </button>
                   </div>
 
                   <p className="text-[11px] text-slate-500 flex items-center gap-1 pt-0.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Padrão 1200x630 px com compressão &lt; 200KB (compatível com WhatsApp).</span>
+                    <span>Nome fixo: <code>og-image.jpg</code> gravado em <code>public/images/</code>.</span>
                   </p>
                 </div>
 
                 {/* Upload & Direct URL Controls */}
                 <div className="md:col-span-7 space-y-4">
-                  {/* Option 1: File Upload */}
-                  <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200/80 space-y-2.5">
+                  {/* Option 1: File Upload with auto-save to public folder */}
+                  <div className="p-4 sm:p-5 bg-gradient-to-br from-orange-50/70 to-amber-50/40 rounded-2xl border border-orange-200/90 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="block text-xs font-bold uppercase tracking-wider text-orange-950">
-                        Opção 1: Enviar Arquivo do Celular ou Computador
+                        Opção 1: Upload com Nome Fixo (Recomendado)
                       </label>
                       <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md">
-                        Auto-Comprime
+                        Auto-Salva em public/images/
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600">
-                      Selecione qualquer foto (JPG, PNG ou WebP). O sistema ajusta a proporção para 1200x630 e reduz o peso para menos de 200 KB para não ser descartada pelo WhatsApp.
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Selecione qualquer foto do seu computador ou celular. O sistema redimensiona para <strong>1200x630 px</strong>, comprime para <strong>&lt; 200 KB</strong> e salva fisicamente em <strong><code>public/images/og-image.jpg</code></strong> com nome fixo.
                     </p>
                     <input
                       ref={socialFileInputRef}
@@ -3592,15 +3718,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       type="button"
                       disabled={isUploadingSocialImg}
                       onClick={() => socialFileInputRef.current?.click()}
-                      className="w-full py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                      className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-orange-600/20 hover:-translate-y-0.5"
                     >
                       <Upload className="w-4 h-4" />
-                      <span>{isUploadingSocialImg ? 'Enviando e Otimizando Imagem...' : 'Inserir Imagem de SEO (Escolher Arquivo)'}</span>
+                      <span>{isUploadingSocialImg ? 'Otimizando e Gravando Imagem...' : 'Inserir Imagem de SEO (Escolher Arquivo)'}</span>
                     </button>
                   </div>
 
                   {/* Option 2: Direct URL */}
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                         Opção 2: Inserir Imagem por Link Direto (URL)
@@ -3614,7 +3740,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </button>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Cole o link direto da imagem e clique no botão <strong>Inserir Imagem</strong>.
+                      Ou cole o link direto da imagem e clique no botão <strong>Inserir Imagem</strong>.
                     </p>
                     <div className="flex gap-2">
                       <input
@@ -3640,7 +3766,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {/* Site URL / Canonical Domain Field */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Endereço / URL Principal do Site (Domínio da Loja)
+                  Endereço Principal do Site (Domínio Oficial da Loja)
                 </label>
                 <input
                   type="url"
@@ -3656,7 +3782,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Esse é o domínio canônico onde o seu site está publicado no Vercel (ou seu domínio próprio). Os robôs do Facebook e WhatsApp usam essa base para validar os links.
+                  O WhatsApp e o Facebook usam esse domínio para carregar a imagem de capa e validar os links de compartilhamento.
                 </p>
               </div>
 
@@ -3699,11 +3825,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-2 flex items-center gap-3">
+              {/* Submit Buttons */}
+              <div className="pt-2 flex items-center gap-3 flex-wrap">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md shadow-orange-600/20"
+                  className="px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md shadow-orange-600/20 hover:-translate-y-0.5"
                 >
                   <Check className="w-4 h-4 text-orange-200" />
                   <span>Salvar Configurações Sociais</span>
@@ -3711,10 +3837,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowSocialModal(true)}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer border border-emerald-200 hover:-translate-y-0.5"
+                >
+                  <Eye className="w-4 h-4 text-emerald-600" />
+                  <span>Testar no Simulador</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadOgImage}
                   className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer border border-slate-200"
                 >
-                  <Eye className="w-4 h-4 text-slate-600" />
-                  <span>Testar Prévia</span>
+                  <Download className="w-4 h-4 text-slate-600" />
+                  <span>Baixar Arquivo (og-image.jpg)</span>
                 </button>
               </div>
             </form>

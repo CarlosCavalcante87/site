@@ -1,12 +1,60 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import { defineConfig, type Plugin } from 'vite';
 import { INITIAL_PRODUCTS } from './src/data/initialData';
 
 function socialCardsPlugin(): Plugin {
   return {
     name: 'social-cards-plugin',
+    configureServer(server) {
+      server.middlewares.use('/api/save-og-image', (req, res) => {
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              if (data && data.imageBase64) {
+                const base64Data = data.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+                const buffer = Buffer.from(base64Data, 'base64');
+                
+                const pubDir = path.resolve(__dirname, 'public');
+                const imagesDir = path.resolve(pubDir, 'images');
+                if (!fs.existsSync(imagesDir)) {
+                  fs.mkdirSync(imagesDir, { recursive: true });
+                }
+
+                // Save with fixed names in public and public/images
+                fs.writeFileSync(path.resolve(pubDir, 'og-image.jpg'), buffer);
+                fs.writeFileSync(path.resolve(imagesDir, 'og-image.jpg'), buffer);
+                fs.writeFileSync(path.resolve(pubDir, 'og-image-whatsapp.jpg'), buffer);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ 
+                  success: true, 
+                  message: 'Imagem salva com sucesso em public/og-image.jpg e public/images/og-image.jpg com nome fixo!',
+                  fixedUrl: '/og-image.jpg',
+                  fullUrl: 'https://achados-cctech.vercel.app/og-image.jpg'
+                }));
+                return;
+              }
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Nenhum dado de imagem fornecido' }));
+            } catch (err: any) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        }
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+      });
+    },
     transformIndexHtml(html, ctx) {
       const anyCtx = ctx as {
         server?: { config?: { server?: unknown } };
