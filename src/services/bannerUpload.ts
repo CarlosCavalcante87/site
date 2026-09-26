@@ -248,31 +248,30 @@ export async function uploadSocialShareImage(
     console.warn('Local endpoint save-og-image note:', err);
   }
 
+  // Also optionally sync to Firebase Storage with fixed name if storage is active
   try {
     const storagePromise = (async () => {
-      const fileName = `og-image-${Date.now()}.jpg`;
-      const storageRef = ref(storage, `banners/social/${fileName}`);
+      const storageRef = ref(storage, 'banners/social/og-image.jpg');
       const blob = dataUrlToBlob(dataUrl);
 
       const snapshot = await uploadBytes(storageRef, blob, {
         contentType: 'image/jpeg',
-        cacheControl: 'public,max-age=31536000,immutable'
+        cacheControl: 'public,max-age=0,must-revalidate'
       });
 
       return await getDownloadURL(snapshot.ref);
     })();
 
     const timeoutPromise = new Promise<string>((_, reject) => {
-      setTimeout(() => reject(new Error('Firebase Storage timeout (falling back to direct optimized image)')), 1500);
+      setTimeout(() => reject(new Error('Firebase Storage timeout')), 1200);
     });
 
-    onProgress?.(75);
-    const publicUrl = await Promise.race([storagePromise, timeoutPromise]);
-    onProgress?.(100);
-    return publicUrl;
+    onProgress?.(80);
+    await Promise.race([storagePromise, timeoutPromise]).catch(() => null);
   } catch (error) {
-    console.info('Firebase Storage upload skipped or timed out, using optimized image directly:', error);
-    onProgress?.(100);
-    return dataUrl;
+    console.info('Firebase Storage upload skipped or timed out (file is saved locally):', error);
   }
+
+  onProgress?.(100);
+  return dataUrl;
 }

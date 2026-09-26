@@ -33,10 +33,22 @@ function socialCardsPlugin(): Plugin {
                 fs.writeFileSync(path.resolve(imagesDir, 'og-image.jpg'), buffer);
                 fs.writeFileSync(path.resolve(pubDir, 'og-image-whatsapp.jpg'), buffer);
 
+                // If dist already exists, update dist as well so immediate preview/build has it
+                const distDir = path.resolve(__dirname, 'dist');
+                if (fs.existsSync(distDir)) {
+                  fs.writeFileSync(path.resolve(distDir, 'og-image.jpg'), buffer);
+                  fs.writeFileSync(path.resolve(distDir, 'og-image-whatsapp.jpg'), buffer);
+                  const distImagesDir = path.resolve(distDir, 'images');
+                  if (!fs.existsSync(distImagesDir)) {
+                    fs.mkdirSync(distImagesDir, { recursive: true });
+                  }
+                  fs.writeFileSync(path.resolve(distImagesDir, 'og-image.jpg'), buffer);
+                }
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ 
                   success: true, 
-                  message: 'Imagem salva com sucesso em public/og-image.jpg e public/images/og-image.jpg com nome fixo!',
+                  message: 'Arquivo og-image.jpg substituído com sucesso na pasta public e public/images!',
                   fixedUrl: '/og-image.jpg',
                   fullUrl: 'https://achados-cctech.vercel.app/og-image.jpg'
                 }));

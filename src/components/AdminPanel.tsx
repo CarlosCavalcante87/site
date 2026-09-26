@@ -1149,10 +1149,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         socialShareImage: url,
       };
       setSiteConfig(updated);
-      setSocialUrlInput(url);
+      setSocialUrlInput('https://achados-cctech.vercel.app/og-image.jpg');
       saveStoredSiteConfig(updated);
       saveSiteConfigToCloud(updated);
-      onShowToast('Imagem de compartilhamento atualizada e comprimida com sucesso!');
+      onShowToast('Arquivo og-image.jpg substituído com sucesso em public/images/!');
     } catch (err) {
       clearTimeout(safetyTimer);
       console.error('Erro ao processar imagem social:', err);
