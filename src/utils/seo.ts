@@ -15,7 +15,23 @@ interface SEOOptions {
 
 export const DEFAULT_TITLE = 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet';
 export const DEFAULT_DESCRIPTION = 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.';
-export const DEFAULT_IMAGE = '/images/banner_achadinhos_virais_1790121462152.jpg';
+export const DEFAULT_IMAGE = '/og-image.jpg';
+
+/**
+ * Returns the public canonical base URL.
+ * Automatically resolves AI Studio dev URLs (ais-dev-*) to public preview URLs (ais-pre-*)
+ * so social crawlers (WhatsApp, Facebook) are never blocked by Google auth login screens.
+ */
+export function getPublicBaseUrl(): string {
+  if (typeof window === 'undefined') {
+    return 'https://ais-pre-u4snn7m472n36a6kgbkxnl-457784679767.us-east5.run.app';
+  }
+  const origin = window.location.origin;
+  if (origin.includes('ais-dev-')) {
+    return origin.replace('ais-dev-', 'ais-pre-');
+  }
+  return origin;
+}
 
 export function setMetaTag(name: string, content: string, isProperty: boolean = false) {
   if (typeof document === 'undefined') return;
@@ -51,12 +67,14 @@ export function setCanonicalUrl(url: string) {
 export function toAbsoluteUrl(pathOrUrl: string): string {
   if (!pathOrUrl) return '';
   if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    if (pathOrUrl.includes('ais-dev-')) {
+      return pathOrUrl.replace('ais-dev-', 'ais-pre-');
+    }
     return pathOrUrl;
   }
-  if (typeof window === 'undefined') return pathOrUrl;
-  const origin = window.location.origin;
+  const base = getPublicBaseUrl();
   const cleanPath = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
-  return `${origin}${cleanPath}`;
+  return `${base}${cleanPath}`;
 }
 
 /**
@@ -74,7 +92,7 @@ export function updateStructuredData(product?: Product | null) {
     document.head.appendChild(script);
   }
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-ntmbpov2wv7232nhqojqk2-300468531200.us-east5.run.app';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-u4snn7m472n36a6kgbkxnl-457784679767.us-east5.run.app';
 
   if (product) {
     // Rich Product Schema for Google Search Snippets (Price, Stock, Rating, Image)

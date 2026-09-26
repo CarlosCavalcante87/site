@@ -15,6 +15,18 @@ function socialCardsPlugin(): Plugin {
       };
       const rawUrl = anyCtx.originalUrl || anyCtx.path || '';
 
+      // Determine public base URL (prefer public preview ais-pre- over private auth ais-dev-)
+      let rawBaseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL 
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : (process.env.VERCEL_URL 
+            ? `https://${process.env.VERCEL_URL}` 
+            : (process.env.APP_URL || 'https://ais-pre-u4snn7m472n36a6kgbkxnl-457784679767.us-east5.run.app'));
+
+      if (rawBaseUrl.includes('ais-dev-')) {
+        rawBaseUrl = rawBaseUrl.replace('ais-dev-', 'ais-pre-');
+      }
+      const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+
       let transformed = html;
 
       // Check if request is targeting a specific product (e.g. ?p=prod-1 or ?produto=prod-1)
@@ -25,24 +37,29 @@ function socialCardsPlugin(): Plugin {
         if (product) {
           const productTitle = `${product.title} | Ofertas do Dia`;
           const productDesc = product.description 
-            ? product.description.slice(0, 160)
+            ? product.description.slice(0, 160).replace(/"/g, '&quot;')
             : `Confira a oferta oficial de ${product.title} na ${product.store}. Compre com desconto e link verificado!`;
-          const rawImg = product.images?.[0] || 'https://ais-pre-mxisftm3n2mcjzjl26bz2d-457784679767.us-east5.run.app/og-image.jpg';
+          const rawImg = product.images?.[0] || `${baseUrl}/og-image.jpg`;
           const productImg = rawImg.startsWith('http') 
             ? rawImg 
-            : `https://ais-pre-mxisftm3n2mcjzjl26bz2d-457784679767.us-east5.run.app${rawImg.startsWith('/') ? '' : '/'}${rawImg}`;
+            : `${baseUrl}${rawImg.startsWith('/') ? '' : '/'}${rawImg}`;
+          const productShareUrl = `${baseUrl}/?p=${product.id}`;
 
           transformed = transformed
-            .replace(/<title>.*?<\/title>/, `<title>${productTitle}</title>`)
-            .replace(/<meta name="description" content=".*?" \/>/, `<meta name="description" content="${productDesc}" />`)
-            .replace(/<meta property="og:title" content=".*?" \/>/, `<meta property="og:title" content="${productTitle}" />`)
-            .replace(/<meta property="og:description" content=".*?" \/>/, `<meta property="og:description" content="${productDesc}" />`)
-            .replace(/<meta property="og:image" content=".*?" \/>/, `<meta property="og:image" content="${productImg}" />`)
-            .replace(/<meta property="og:image:secure_url" content=".*?" \/>/, `<meta property="og:image:secure_url" content="${productImg}" />`)
-            .replace(/<meta name="twitter:title" content=".*?" \/>/, `<meta name="twitter:title" content="${productTitle}" />`)
-            .replace(/<meta name="twitter:description" content=".*?" \/>/, `<meta name="twitter:description" content="${productDesc}" />`)
-            .replace(/<meta name="twitter:image" content=".*?" \/>/, `<meta name="twitter:image" content="${productImg}" />`)
-            .replace(/<link rel="image_src" href=".*?" \/>/, `<link rel="image_src" href="${productImg}" />`);
+            .replace(/<title>[\s\S]*?<\/title>/, `<title>${productTitle}</title>`)
+            .replace(/<link\s+rel="canonical"\s+href="[\s\S]*?"\s*\/?>/i, `<link rel="canonical" href="${productShareUrl}" />`)
+            .replace(/<meta\s+name="description"\s+content="[\s\S]*?"\s*\/?>/i, `<meta name="description" content="${productDesc}" />`)
+            .replace(/<meta\s+property="og:url"\s+content="[\s\S]*?"\s*\/?>/i, `<meta property="og:url" content="${productShareUrl}" />`)
+            .replace(/<meta\s+property="og:title"\s+content="[\s\S]*?"\s*\/?>/i, `<meta property="og:title" content="${productTitle}" />`)
+            .replace(/<meta\s+property="og:description"\s+content="[\s\S]*?"\s*\/?>/i, `<meta property="og:description" content="${productDesc}" />`)
+            .replace(/<meta\s+property="og:image"\s+content="[\s\S]*?"\s*\/?>/i, `<meta property="og:image" content="${productImg}" />`)
+            .replace(/<meta\s+property="og:image:secure_url"\s+content="[\s\S]*?"\s*\/?>/i, `<meta property="og:image:secure_url" content="${productImg}" />`)
+            .replace(/<meta\s+property="og:image:alt"\s+content="[\s\S]*?"\s*\/?>/i, `<meta property="og:image:alt" content="${productTitle}" />`)
+            .replace(/<link\s+rel="image_src"\s+href="[\s\S]*?"\s*\/?>/i, `<link rel="image_src" href="${productImg}" />`)
+            .replace(/<meta\s+name="twitter:title"\s+content="[\s\S]*?"\s*\/?>/i, `<meta name="twitter:title" content="${productTitle}" />`)
+            .replace(/<meta\s+name="twitter:description"\s+content="[\s\S]*?"\s*\/?>/i, `<meta name="twitter:description" content="${productDesc}" />`)
+            .replace(/<meta\s+name="twitter:image"\s+content="[\s\S]*?"\s*\/?>/i, `<meta name="twitter:image" content="${productImg}" />`)
+            .replace(/<meta\s+name="twitter:image:alt"\s+content="[\s\S]*?"\s*\/?>/i, `<meta name="twitter:image:alt" content="${productTitle}" />`);
         }
       }
 

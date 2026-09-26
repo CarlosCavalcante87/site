@@ -12,7 +12,8 @@ import {
   Flame, 
   ChevronRight,
   Maximize2,
-  Layers
+  Layers,
+  Facebook
 } from 'lucide-react';
 import { Product } from '../types';
 import { STORE_CONFIG, trackProductClick } from '../services/storage';
@@ -20,6 +21,7 @@ import { trackCloudProductClick } from '../services/firebaseService';
 import { StoreLogo } from './StoreLogo';
 import { WhatsAppIcon } from './WhatsAppButton';
 import { PriceHistoryChart } from './PriceHistoryChart';
+import { getPublicBaseUrl } from '../utils/seo';
 
 interface ProductDetailProps {
   product: Product;
@@ -96,8 +98,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
   };
 
   const getProductShareUrl = () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/?p=${product.id}`;
+    const base = getPublicBaseUrl();
+    return `${base}/?p=${product.id}`;
   };
 
   const getShareMessage = () => {
@@ -122,6 +124,13 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
       navigator.clipboard.writeText(shareMessage).catch(() => {});
     }
     onShowToast('Link do achadinho copiado! Abrindo WhatsApp...');
+  };
+
+  const handleShareFacebook = () => {
+    const url = getProductShareUrl();
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    window.open(fbUrl, '_blank', 'noopener,noreferrer,width=620,height=580');
+    onShowToast('Abrindo compartilhamento do Facebook...');
   };
 
   return (
@@ -238,6 +247,14 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                 <WhatsAppIcon className="w-4 h-4 fill-current shrink-0 text-white" />
                 <span>WhatsApp</span>
               </a>
+              <button
+                type="button"
+                onClick={handleShareFacebook}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+              >
+                <Facebook className="w-3.5 h-3.5 fill-current" />
+                <span>Facebook</span>
+              </button>
               <button
                 type="button"
                 onClick={handleCopyLink}
