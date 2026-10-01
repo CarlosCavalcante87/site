@@ -1,1 +1,31 @@
 @import "tailwindcss";
+
+@keyframes whatsappPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22);
+  }
+}
+
+@keyframes whatsappPingRing {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  70%, 100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-icon-pulse {
+  animation: whatsappPulse 1.8s ease-in-out infinite;
+  display: inline-block;
+  transform-origin: center;
+}
+
+.animate-whatsapp-ping {
+  animation: whatsappPingRing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

@@ -88,7 +88,8 @@ export const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
           aria-label="Tirar dúvidas pelo WhatsApp"
         >
           <div className="relative flex items-center justify-center shrink-0">
-            <WhatsAppIcon className="w-5 h-5 text-white fill-current animate-icon-pulse" />
+            <span className="absolute w-5 h-5 rounded-full bg-white/40 animate-whatsapp-ping pointer-events-none" />
+            <WhatsAppIcon className="w-5 h-5 text-white fill-current animate-icon-pulse relative z-10 drop-shadow-xs" />
           </div>
           <span className="whitespace-nowrap tracking-tight font-display text-xs sm:text-sm">
             Tirar Dúvidas

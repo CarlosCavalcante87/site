@@ -67,7 +67,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           aria-label="Tirar dúvidas pelo WhatsApp"
         >
           <div className="relative flex items-center justify-center shrink-0">
-            <WhatsAppIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#25D366] fill-current animate-icon-pulse" />
+            <span className="absolute w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full bg-[#25D366]/30 animate-whatsapp-ping pointer-events-none" />
+            <WhatsAppIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#25D366] fill-current animate-icon-pulse relative z-10" />
           </div>
           <span className="tracking-tight whitespace-nowrap font-bold text-emerald-700">
             Tirar Dúvidas

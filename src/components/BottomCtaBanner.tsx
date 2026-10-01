@@ -143,7 +143,7 @@ export const BottomCtaBanner: React.FC<BottomCtaBannerProps> = ({
                 className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/45 transition-all transform active:scale-98 cursor-pointer group"
               >
                 <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                  <WhatsAppIcon className="w-4 h-4 fill-white" />
+                  <WhatsAppIcon className="w-4 h-4 fill-white animate-icon-pulse" />
                 </div>
                 <span className="truncate">{config.buttonText || 'Pedir Oferta sem Custo no WhatsApp'}</span>
                 <ArrowRight className="w-4 h-4 text-emerald-200 group-hover:translate-x-1 transition-transform shrink-0" />
