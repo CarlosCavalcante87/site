@@ -3856,7 +3856,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 />
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
-                Ao clicar em &quot;Ir à Loja&quot; ou no produto, o usuário será direcionado diretamente para este link.
+                Ao clicar em &quot;Atualizar preço&quot; ou no produto, o usuário será direcionado diretamente para este link.
               </p>
             </div>
 
@@ -4393,7 +4393,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 🔥 {totalRealClicks}
               </div>
               <p className="text-[11px] text-slate-500 mt-2">
-                Total de cliques 100% reais dados por visitantes em botões de compra ("Ir à Loja" / "Comprar")
+                Total de cliques 100% reais dados por visitantes em botões de compra ("Atualizar preço" / "Comprar")
               </p>
             </div>
 
@@ -4439,7 +4439,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <Flame className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                   <p className="font-bold text-slate-700">Nenhum clique registrado ainda</p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Conforme visitantes reais acessarem e clicarem em "Ir à Loja" nas ofertas, as estatísticas reais aparecerão aqui.
+                    Conforme visitantes reais acessarem e clicarem em "Atualizar preço" nas ofertas, as estatísticas reais aparecerão aqui.
                   </p>
                 </div>
               ) : (

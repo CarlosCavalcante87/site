@@ -247,9 +247,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   ? 'bg-slate-900 hover:bg-black text-white hover:ring-2 hover:ring-orange-400'
                   : 'bg-slate-900 hover:bg-slate-800 text-white'
               }`}
-              title={`Abrir direto no site oficial do parceiro (${product.store})`}
+              title={`Atualizar preço direto no site oficial (${product.store})`}
             >
-              <span className="whitespace-nowrap font-bold">Ir à Loja</span>
+              <span className="whitespace-nowrap font-bold">Atualizar preço</span>
               <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400 shrink-0" />
             </button>
           </div>
