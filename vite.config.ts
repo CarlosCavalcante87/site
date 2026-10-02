@@ -1,8 +1,112 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import { defineConfig, type Plugin } from 'vite';
 import { INITIAL_PRODUCTS } from './src/data/initialData';
+
+function seoUploadPlugin(): Plugin {
+  const handleSeoUpload = (req: any, res: any) => {
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk: Buffer) => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body);
+          const rawBase64 = payload.imageBase64 || '';
+          if (!rawBase64) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Nenhuma imagem fornecida' }));
+            return;
+          }
+
+          const cleanBase64 = rawBase64.replace(/^data:image\/\w+;base64,/, '');
+          const buffer = Buffer.from(cleanBase64, 'base64');
+
+          // Target folders: src/assets/images (explicitly requested), public/images, public/assets/images
+          const targetPaths = [
+            path.resolve(process.cwd(), 'src/assets/images/seo.jpg'),
+            path.resolve(process.cwd(), 'public/images/seo.jpg'),
+            path.resolve(process.cwd(), 'public/assets/images/seo.jpg'),
+            path.resolve(process.cwd(), 'dist/images/seo.jpg'),
+            path.resolve(process.cwd(), 'dist/assets/images/seo.jpg'),
+          ];
+
+          for (const target of targetPaths) {
+            const dir = path.dirname(target);
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(target, buffer);
+          }
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            success: true,
+            url: `/images/seo.jpg?v=${Date.now()}`,
+            path: 'src/assets/images/seo.jpg',
+            sizeBytes: buffer.length
+          }));
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return true;
+    }
+    return false;
+  };
+
+  const handleSeoImageServe = (req: any, res: any, next: any) => {
+    const url = req.url || '';
+    if (url.startsWith('/images/seo.jpg') || url.startsWith('/assets/images/seo.jpg')) {
+      const candidates = [
+        path.resolve(process.cwd(), 'src/assets/images/seo.jpg'),
+        path.resolve(process.cwd(), 'public/images/seo.jpg'),
+        path.resolve(process.cwd(), 'public/assets/images/seo.jpg')
+      ];
+
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          const buffer = fs.readFileSync(candidate);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'image/jpeg');
+          res.setHeader('Content-Length', buffer.length);
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(buffer);
+          return;
+        }
+      }
+    }
+    next();
+  };
+
+  return {
+    name: 'seo-upload-plugin',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/api/upload-seo') {
+          if (handleSeoUpload(req, res)) return;
+        }
+        handleSeoImageServe(req, res, next);
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/api/upload-seo') {
+          if (handleSeoUpload(req, res)) return;
+        }
+        handleSeoImageServe(req, res, next);
+      });
+    }
+  };
+}
 
 function socialCardsPlugin(): Plugin {
   return {
@@ -53,7 +157,7 @@ function socialCardsPlugin(): Plugin {
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss(), socialCardsPlugin()],
+    plugins: [react(), tailwindcss(), socialCardsPlugin(), seoUploadPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
