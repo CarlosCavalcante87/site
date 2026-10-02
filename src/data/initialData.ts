@@ -373,7 +373,7 @@ export const INITIAL_SITE_CONFIG = {
     whatsappMessage: 'Olá! Estava navegando no site e gostaria de pedir ajuda para encontrar uma oferta/produto confiável:',
   },
   seo: {
-    ogImageUrl: '/images/seo.jpg',
+    ogImageUrl: '/src/assets/images/seo.jpg',
     ogTitle: 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
     ogDescription: 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.',
     keywords: 'achados do dia, achadinhos, promoções, cupons de desconto, shopee, mercado livre, amazon, shein, ofertas relâmpago',

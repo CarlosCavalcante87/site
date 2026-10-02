@@ -47,7 +47,7 @@ function seoUploadPlugin(): Plugin {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({
             success: true,
-            url: `/images/seo.jpg?v=${Date.now()}`,
+            url: `/src/assets/images/seo.jpg?v=${Date.now()}`,
             path: 'src/assets/images/seo.jpg',
             sizeBytes: buffer.length
           }));
@@ -64,7 +64,11 @@ function seoUploadPlugin(): Plugin {
 
   const handleSeoImageServe = (req: any, res: any, next: any) => {
     const url = req.url || '';
-    if (url.startsWith('/images/seo.jpg') || url.startsWith('/assets/images/seo.jpg')) {
+    if (
+      url.startsWith('/src/assets/images/seo.jpg') || 
+      url.startsWith('/assets/images/seo.jpg') || 
+      url.startsWith('/images/seo.jpg')
+    ) {
       const candidates = [
         path.resolve(process.cwd(), 'src/assets/images/seo.jpg'),
         path.resolve(process.cwd(), 'public/images/seo.jpg'),

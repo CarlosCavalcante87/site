@@ -42,7 +42,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     keywords: 'achados do dia, achadinhos, promoções, cupons de desconto, shopee, mercado livre, amazon, shein, ofertas relâmpago',
   };
 
-  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || '/images/seo.jpg');
+  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || '/src/assets/images/seo.jpg');
   const [title, setTitle] = useState<string>(currentSeo.ogTitle || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet');
   const [description, setDescription] = useState<string>(currentSeo.ogDescription || 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.');
   const [keywords, setKeywords] = useState<string>(currentSeo.keywords || 'achados do dia, achadinhos, promoções, cupons');
@@ -169,7 +169,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
 
   const handleSaveSeo = () => {
     const updatedSeo: SeoConfig = {
-      ogImageUrl: imageUrl.trim() || '/images/seo.jpg',
+      ogImageUrl: imageUrl.trim() || '/src/assets/images/seo.jpg',
       ogTitle: title.trim() || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
       ogDescription: description.trim() || 'Encontre os melhores achadinhos virais com links seguros.',
       keywords: keywords.trim(),
@@ -346,7 +346,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setImageUrl('/images/seo.jpg');
+                    setImageUrl('/src/assets/images/seo.jpg');
                     setImageSizeKb(95);
                     setSavedFilePath('src/assets/images/seo.jpg');
                     onShowToast('Imagem seo.jpg selecionada!');

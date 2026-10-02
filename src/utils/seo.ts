@@ -15,7 +15,7 @@ interface SEOOptions {
 
 export const DEFAULT_TITLE = 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet';
 export const DEFAULT_DESCRIPTION = 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.';
-export const DEFAULT_IMAGE = '/images/seo.jpg';
+export const DEFAULT_IMAGE = '/src/assets/images/seo.jpg';
 
 export function setMetaTag(name: string, content: string, isProperty: boolean = false) {
   if (typeof document === 'undefined') return;

@@ -190,9 +190,18 @@ export const getStoredSiteConfig = (): SiteConfig => {
       return INITIAL_SITE_CONFIG;
     }
     const parsed = JSON.parse(raw);
+    const seo = {
+      ...INITIAL_SITE_CONFIG.seo,
+      ...(parsed?.seo || {}),
+    };
+    if (seo.ogImageUrl === '/images/seo.jpg' || seo.ogImageUrl === '/og-image.jpg') {
+      seo.ogImageUrl = '/src/assets/images/seo.jpg';
+    }
+
     return {
       ...INITIAL_SITE_CONFIG,
       ...(parsed || {}),
+      seo,
       bottomCtaBanner: {
         ...INITIAL_SITE_CONFIG.bottomCtaBanner,
         ...(parsed?.bottomCtaBanner || {}),
