@@ -72,8 +72,11 @@ import {
   Dumbbell,
   Car,
   Dog,
-  Loader2
+  Loader2,
+  Share2,
+  Globe
 } from 'lucide-react';
+import { SeoSettingsPanel } from './SeoSettingsPanel';
 import {
   removeBannerImage,
   uploadBannerImage
@@ -431,7 +434,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   }, []);
 
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'products' | 'new-product' | 'banners' | 'categories' | 'stats' | 'security' | 'backup'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'new-product' | 'banners' | 'categories' | 'stats' | 'security' | 'backup' | 'seo'>('products');
   const [searchAdmin, setSearchAdmin] = useState('');
   
   // Banners & Site Settings State
@@ -2401,6 +2404,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('seo')}
+            className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
+              activeTab === 'seo'
+                ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/25 ring-2 ring-orange-400/40'
+                : 'text-slate-600 bg-slate-50 border border-slate-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 hover:shadow-xs'
+            }`}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Imagem do Link & SEO</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('categories')}
             className={`shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 ${
               activeTab === 'categories'
@@ -2437,6 +2452,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
         </div>
       </div>
+
+      {/* TAB: SEO & LINK PREVIEW IMAGE (FERRAMENTA DE IMAGEM DO LINK / WHATSAPP) */}
+      {activeTab === 'seo' && (
+        <SeoSettingsPanel
+          siteConfig={siteConfig}
+          banners={banners}
+          onUpdateConfig={(updated) => {
+            setSiteConfig(updated);
+            saveStoredSiteConfig(updated);
+            saveSiteConfigToCloud(updated);
+          }}
+          onShowToast={onShowToast}
+        />
+      )}
 
       {/* TAB: BANNERS & WHATSAPP SETTINGS (New Requested Feature!) */}
       {activeTab === 'banners' && (
@@ -2841,6 +2870,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
           )}
+
+          {/* Quick Shortcut Card: Ferramenta de Imagem de SEO & Compartilhamento */}
+          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-7 border border-indigo-500/30 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center shrink-0">
+                <Share2 className="w-6 h-6 text-indigo-400" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>Imagem do Link no WhatsApp & Redes Sociais</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                    Otimizador Ativo
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                  Escolha a foto, título e descrição que aparecem automaticamente quando o link do site é enviado no WhatsApp, Facebook ou Google.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('seo');
+                window.scrollTo({ top: 300, behavior: 'smooth' });
+              }}
+              className="py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 cursor-pointer shrink-0 transition-all"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Abrir Ferramenta de SEO</span>
+            </button>
+          </div>
 
           {/* WhatsApp Settings Section (Requested feature: Botão WhatsApp "Tirar Dúvidas") */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">

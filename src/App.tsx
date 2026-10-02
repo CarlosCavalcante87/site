@@ -276,19 +276,21 @@ export default function App() {
         url: typeof window !== 'undefined' ? `${window.location.origin}/#produto/${currentProduct.id}` : ''
       }, currentProduct);
     } else {
-      // Home / Catalog view: Use the 1st active banner image for WhatsApp preview and Google social cards
+      // Home / Catalog view: Use siteConfig.seo custom image or fallback to /og-image.jpg
       const activeBanners = banners.filter((b) => b.isActive);
       const firstBanner = activeBanners[0] || banners[0];
-      const bannerImage = firstBanner?.imageUrl || '/images/banner_achadinhos_virais_1790121462152.jpg';
+      const seoImage = siteConfig.seo?.ogImageUrl || firstBanner?.imageUrl || '/og-image.jpg';
+      const seoTitle = siteConfig.seo?.ogTitle || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet';
+      const seoDesc = siteConfig.seo?.ogDescription || 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.';
 
       updatePageSEO({
-        title: 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
-        description: 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.',
-        image: bannerImage,
+        title: seoTitle,
+        description: seoDesc,
+        image: seoImage,
         url: typeof window !== 'undefined' ? window.location.origin : ''
       }, null);
     }
-  }, [currentView, currentProduct, banners]);
+  }, [currentView, currentProduct, banners, siteConfig]);
 
   const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedStore || selectedBadge || onlyFeatured);
 

@@ -71,11 +71,19 @@ export interface BottomCtaBannerConfig {
   whatsappMessage?: string;
 }
 
+export interface SeoConfig {
+  ogImageUrl?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  keywords?: string;
+}
+
 export interface SiteConfig {
   whatsappNumber: string;
   whatsappDefaultMessage: string;
   mobileDoubleColumns?: boolean;
   bottomCtaBanner?: BottomCtaBannerConfig;
+  seo?: SeoConfig;
 }
 
 export type SortOption = 'latest' | 'popular' | 'featured' | 'title';
