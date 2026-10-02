@@ -26,13 +26,22 @@ function seoUploadPlugin(): Plugin {
           const cleanBase64 = rawBase64.replace(/^data:image\/\w+;base64,/, '');
           const buffer = Buffer.from(cleanBase64, 'base64');
 
-          // Target folders: src/assets/images (explicitly requested), public/images, public/assets/images
+          // Target folders: src/assets/images (explicitly requested), public/src/assets/images, public/assets/images, public/images
           const targetPaths = [
+            path.resolve(process.cwd(), 'src/assets/images/seo.jpeg'),
             path.resolve(process.cwd(), 'src/assets/images/seo.jpg'),
-            path.resolve(process.cwd(), 'public/images/seo.jpg'),
+            path.resolve(process.cwd(), 'public/src/assets/images/seo.jpeg'),
+            path.resolve(process.cwd(), 'public/src/assets/images/seo.jpg'),
+            path.resolve(process.cwd(), 'public/assets/images/seo.jpeg'),
             path.resolve(process.cwd(), 'public/assets/images/seo.jpg'),
-            path.resolve(process.cwd(), 'dist/images/seo.jpg'),
+            path.resolve(process.cwd(), 'public/images/seo.jpeg'),
+            path.resolve(process.cwd(), 'public/images/seo.jpg'),
+            path.resolve(process.cwd(), 'dist/src/assets/images/seo.jpeg'),
+            path.resolve(process.cwd(), 'dist/src/assets/images/seo.jpg'),
+            path.resolve(process.cwd(), 'dist/assets/images/seo.jpeg'),
             path.resolve(process.cwd(), 'dist/assets/images/seo.jpg'),
+            path.resolve(process.cwd(), 'dist/images/seo.jpeg'),
+            path.resolve(process.cwd(), 'dist/images/seo.jpg'),
           ];
 
           for (const target of targetPaths) {
@@ -47,8 +56,8 @@ function seoUploadPlugin(): Plugin {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({
             success: true,
-            url: `/src/assets/images/seo.jpg?v=${Date.now()}`,
-            path: 'src/assets/images/seo.jpg',
+            url: `/src/assets/images/seo.jpeg?v=${Date.now()}`,
+            path: 'src/assets/images/seo.jpeg',
             sizeBytes: buffer.length
           }));
         } catch (err: any) {
@@ -63,16 +72,19 @@ function seoUploadPlugin(): Plugin {
   };
 
   const handleSeoImageServe = (req: any, res: any, next: any) => {
-    const url = req.url || '';
+    const rawUrl = req.url || '';
+    const cleanUrl = rawUrl.split('?')[0];
     if (
-      url.startsWith('/src/assets/images/seo.jpg') || 
-      url.startsWith('/assets/images/seo.jpg') || 
-      url.startsWith('/images/seo.jpg')
+      cleanUrl.includes('seo.jpeg') || 
+      cleanUrl.includes('seo.jpg')
     ) {
       const candidates = [
+        path.resolve(process.cwd(), 'src/assets/images/seo.jpeg'),
         path.resolve(process.cwd(), 'src/assets/images/seo.jpg'),
-        path.resolve(process.cwd(), 'public/images/seo.jpg'),
-        path.resolve(process.cwd(), 'public/assets/images/seo.jpg')
+        path.resolve(process.cwd(), 'public/src/assets/images/seo.jpeg'),
+        path.resolve(process.cwd(), 'public/src/assets/images/seo.jpg'),
+        path.resolve(process.cwd(), 'public/images/seo.jpeg'),
+        path.resolve(process.cwd(), 'public/images/seo.jpg')
       ];
 
       for (const candidate of candidates) {

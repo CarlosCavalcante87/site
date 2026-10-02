@@ -42,7 +42,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     keywords: 'achados do dia, achadinhos, promoções, cupons de desconto, shopee, mercado livre, amazon, shein, ofertas relâmpago',
   };
 
-  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || '/src/assets/images/seo.jpg');
+  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || '/src/assets/images/seo.jpeg');
   const [title, setTitle] = useState<string>(currentSeo.ogTitle || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet');
   const [description, setDescription] = useState<string>(currentSeo.ogDescription || 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.');
   const [keywords, setKeywords] = useState<string>(currentSeo.keywords || 'achados do dia, achadinhos, promoções, cupons');
@@ -51,7 +51,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
   const [imageSizeKb, setImageSizeKb] = useState<number | null>(null);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
-  const [savedFilePath, setSavedFilePath] = useState<string>('src/assets/images/seo.jpg');
+  const [savedFilePath, setSavedFilePath] = useState<string>('src/assets/images/seo.jpeg');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,14 +64,14 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
       const base64Length = str.length - (str.indexOf(',') + 1);
       return Math.round((base64Length * 3) / 4 / 1024);
     }
-    if (str.includes('seo.jpg')) return 95;
+    if (str.includes('seo.jpeg') || str.includes('seo.jpg')) return 95;
     if (str === '/og-image.jpg') return 95;
     if (str === '/og-image-whatsapp.jpg') return 45;
     if (str.includes('banner_achadinhos_virais')) return 675;
     return null;
   };
 
-  // Compress & Optimize Image using client-side canvas and upload to server as seo.jpg in src/assets/images
+  // Compress & Optimize Image using client-side canvas and upload to server as seo.jpeg in src/assets/images
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -128,7 +128,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
         const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         const kb = Math.round((compressedDataUrl.length * 3) / 4 / 1024);
 
-        // Upload to /api/upload-seo to save permanently as src/assets/images/seo.jpg and public/images/seo.jpg
+        // Upload to /api/upload-seo to save permanently as src/assets/images/seo.jpeg
         fetch('/api/upload-seo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -140,8 +140,8 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
             if (data.success) {
               setImageUrl(data.url);
               setImageSizeKb(kb);
-              setSavedFilePath('src/assets/images/seo.jpg');
-              onShowToast(`✅ Imagem salva com sucesso na pasta ASSETS - IMAGES como seo.jpg (${kb} KB)!`);
+              setSavedFilePath('src/assets/images/seo.jpeg');
+              onShowToast(`✅ Imagem salva com sucesso na pasta ASSETS - IMAGES como seo.jpeg (${kb} KB)!`);
             } else {
               setImageUrl(compressedDataUrl);
               setImageSizeKb(kb);
@@ -169,7 +169,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
 
   const handleSaveSeo = () => {
     const updatedSeo: SeoConfig = {
-      ogImageUrl: imageUrl.trim() || '/src/assets/images/seo.jpg',
+      ogImageUrl: imageUrl.trim() || '/src/assets/images/seo.jpeg',
       ogTitle: title.trim() || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
       ogDescription: description.trim() || 'Encontre os melhores achadinhos virais com links seguros.',
       keywords: keywords.trim(),
@@ -189,7 +189,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     }, null);
 
     onUpdateConfig(updatedConfig);
-    onShowToast('✅ Imagem salva na pasta ASSETS - IMAGES como seo.jpg e configurações de SEO atualizadas!');
+    onShowToast('✅ Imagem salva na pasta ASSETS - IMAGES como seo.jpeg e configurações de SEO atualizadas!');
   };
 
   const handleCopyLink = () => {
@@ -318,7 +318,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                 </code>
               </div>
               <span className="text-[11px] text-indigo-700 font-bold bg-indigo-100/80 px-2.5 py-0.5 rounded-lg border border-indigo-200/60 w-fit">
-                Salvo automaticamente como seo.jpg
+                Salvo automaticamente como seo.jpeg
               </span>
             </div>
 
@@ -340,22 +340,22 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                   className="flex-1 py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>{isCompressing ? 'Salvando em ASSETS - IMAGES...' : 'Fazer Upload para ASSETS - IMAGES (seo.jpg)'}</span>
+                  <span>{isCompressing ? 'Salvando em ASSETS - IMAGES...' : 'Fazer Upload para ASSETS - IMAGES (seo.jpeg)'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    setImageUrl('/src/assets/images/seo.jpg');
+                    setImageUrl('/src/assets/images/seo.jpeg');
                     setImageSizeKb(95);
-                    setSavedFilePath('src/assets/images/seo.jpg');
-                    onShowToast('Imagem seo.jpg selecionada!');
+                    setSavedFilePath('src/assets/images/seo.jpeg');
+                    onShowToast('Imagem seo.jpeg selecionada!');
                   }}
                   className="py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  title="Usar seo.jpg da pasta ASSETS - IMAGES"
+                  title="Usar seo.jpeg da pasta ASSETS - IMAGES"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Usar seo.jpg Atual</span>
+                  <span>Usar seo.jpeg Atual</span>
                 </button>
               </div>
 
