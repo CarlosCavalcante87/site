@@ -276,10 +276,10 @@ export default function App() {
         url: typeof window !== 'undefined' ? `${window.location.origin}/#produto/${currentProduct.id}` : ''
       }, currentProduct);
     } else {
-      // Home / Catalog view: Use siteConfig.seo custom image or fallback to /og-image.jpg
+      // Home / Catalog view: Use siteConfig.seo custom image or fallback to /images/seo.jpg
       const activeBanners = banners.filter((b) => b.isActive);
       const firstBanner = activeBanners[0] || banners[0];
-      const seoImage = siteConfig.seo?.ogImageUrl || firstBanner?.imageUrl || '/og-image.jpg';
+      const seoImage = siteConfig.seo?.ogImageUrl || '/images/seo.jpg';
       const seoTitle = siteConfig.seo?.ogTitle || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet';
       const seoDesc = siteConfig.seo?.ogDescription || 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.';
 

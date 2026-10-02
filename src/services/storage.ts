@@ -195,12 +195,12 @@ export const getStoredSiteConfig = (): SiteConfig => {
       ...(parsed?.seo || {}),
     };
     if (
-      seo.ogImageUrl === '/images/seo.jpg' ||
       seo.ogImageUrl === '/images/seo.jpeg' ||
       seo.ogImageUrl === '/src/assets/images/seo.jpeg' ||
+      seo.ogImageUrl === '/src/assets/images/seo.jpg' ||
       seo.ogImageUrl === '/og-image.jpg'
     ) {
-      seo.ogImageUrl = '/src/assets/images/seo.jpg';
+      seo.ogImageUrl = '/images/seo.jpg';
     }
 
     return {

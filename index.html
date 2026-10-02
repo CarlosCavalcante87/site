@@ -18,21 +18,27 @@
 
     <!-- Favicon & Touch Icons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/images/banner_achadinhos_virais_1790121462152.jpg" />
+    <link rel="apple-touch-icon" href="/images/seo.jpg" />
+
+    <!-- Canonical URL (Dynamically synchronized in runtime) -->
+    <link rel="canonical" href="https://achadosdodia.com.br" />
+
+    <!-- Legacy Social Image link (WhatsApp / Telegram bot crawler compatibility) -->
+    <link rel="image_src" href="/images/seo.jpg" />
 
     <!-- OpenGraph / Facebook / WhatsApp Preview Card -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Achados do Dia" />
     <meta property="og:locale" content="pt_BR" />
-    <meta property="og:url" content="./" />
+    <meta property="og:url" content="/" />
     <meta property="og:title" content="Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet" />
     <meta 
       property="og:description" 
       content="Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros." 
     />
-    <!-- Imagem de visualização salva na pasta src/assets/images/seo.jpg otimizada para WhatsApp e Facebook -->
-    <meta property="og:image" content="/src/assets/images/seo.jpg" />
-    <meta property="og:image:secure_url" content="/src/assets/images/seo.jpg" />
+    <!-- Imagem de visualização padrão salva na pasta public/images/seo.jpg otimizada para WhatsApp e Facebook -->
+    <meta property="og:image" content="/images/seo.jpg" />
+    <meta property="og:image:secure_url" content="/images/seo.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -45,7 +51,7 @@
       name="twitter:description" 
       content="Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros." 
     />
-    <meta name="twitter:image" content="/src/assets/images/seo.jpg" />
+    <meta name="twitter:image" content="/images/seo.jpg" />
     <meta name="twitter:image:alt" content="Achados do Dia - Melhores Ofertas e Achadinhos Virais" />
 
     <!-- Schema.org JSON-LD Structured Data for Google Rich Results -->
@@ -74,9 +80,23 @@
           "url": "/",
           "logo": {
             "@type": "ImageObject",
-            "url": "/src/assets/images/seo.jpg",
+            "url": "/images/seo.jpg",
             "width": 1200,
             "height": 630
+          }
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "/#app",
+          "name": "Achados do Dia",
+          "applicationCategory": "ShoppingApplication",
+          "operatingSystem": "All",
+          "browserRequirements": "Requires JavaScript. Requires HTML5.",
+          "description": "Agregador de ofertas e achadinhos das melhores lojas online (Mercado Livre, Shopee, Amazon e Shein) com links diretos oficiais.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "BRL"
           }
         },
         {
