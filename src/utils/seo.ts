@@ -74,7 +74,7 @@ export function updateStructuredData(product?: Product | null) {
     document.head.appendChild(script);
   }
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-ntmbpov2wv7232nhqojqk2-300468531200.us-east5.run.app';
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
   if (product) {
     // Rich Product Schema for Google Search Snippets (Price, Stock, Rating, Image)

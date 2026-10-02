@@ -9,7 +9,6 @@ import {
   Eye, 
   RefreshCw, 
   Copy, 
-  Sparkles,
   Smartphone,
   Globe,
   Info,
@@ -55,8 +54,8 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const currentDomain = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-ntmbpov2wv7232nhqojqk2-300468531200.us-east5.run.app';
-  const displayDomain = currentDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const currentDomain = typeof window !== 'undefined' ? window.location.origin : '';
+  const displayDomain = currentDomain ? currentDomain.replace(/^https?:\/\//, '').replace(/\/$/, '') : 'achadosdodia.com.br';
 
   // Calculate image size helper
   const calculateKb = (str: string) => {
@@ -168,8 +167,12 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
   };
 
   const handleSaveSeo = () => {
+    const cleanOgUrl = imageUrl.trim().startsWith('/src/assets/images/seo')
+      ? '/src/assets/images/seo.jpeg'
+      : (imageUrl.trim().split('?')[0] || '/src/assets/images/seo.jpeg');
+
     const updatedSeo: SeoConfig = {
-      ogImageUrl: imageUrl.trim() || '/src/assets/images/seo.jpeg',
+      ogImageUrl: cleanOgUrl,
       ogTitle: title.trim() || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
       ogDescription: description.trim() || 'Encontre os melhores achadinhos virais com links seguros.',
       keywords: keywords.trim(),
@@ -217,37 +220,6 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
 
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-indigo-500/20 shadow-xl relative overflow-hidden">
-        <div className="absolute -top-12 -right-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-400/30">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
-              <span>Ferramenta de SEO & OpenGraph Social</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Imagem de Compartilhamento no WhatsApp & Redes
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Personalize a imagem, o título e a descrição que aparecem automaticamente quando você ou seus clientes compartilham o link do site no <strong>WhatsApp</strong>, <strong>Facebook</strong>, <strong>Instagram</strong>, <strong>Telegram</strong> e <strong>Google</strong>.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleSaveSeo}
-              className="py-3 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm flex items-center gap-2 shadow-lg shadow-orange-500/25 cursor-pointer transition-all active:scale-95"
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>Salvar Imagem de SEO</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Image Selector & SEO Text Inputs */}
         <div className="lg:col-span-7 space-y-6">
@@ -381,68 +353,6 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                   placeholder="https://... ou /og-image.jpg"
                   className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500 font-mono"
                 />
-              </div>
-            </div>
-
-            {/* Presets Recomendados (100% Compatíveis e com CDN Permanente) */}
-            <div className="pt-3 border-t border-slate-100">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                ⚡ Imagens Prontas & 100% Aprovadas (Content-Type JPEG Permanente):
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageUrl('https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&h=630&q=85');
-                    setImageSizeKb(106);
-                    onShowToast('Banner de Ofertas selecionado! (106 KB, 100% aprovado no Facebook)');
-                  }}
-                  className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col gap-1.5 ${
-                    imageUrl.includes('photo-1607082348824') ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
-                  }`}
-                >
-                  <div className="aspect-[1.91/1] w-full rounded-lg overflow-hidden bg-slate-200">
-                    <img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=400&h=210&q=80" alt="Ofertas & Promoções" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="text-[11px] font-bold text-slate-900 truncate">🛍️ Ofertas & Cupons</div>
-                  <div className="text-[10px] text-emerald-600 font-semibold">106 KB • Recomendado</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageUrl('https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&h=630&q=85');
-                    setImageSizeKb(112);
-                    onShowToast('Banner de Gadgets selecionado! (112 KB)');
-                  }}
-                  className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col gap-1.5 ${
-                    imageUrl.includes('photo-1526170375885') ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
-                  }`}
-                >
-                  <div className="aspect-[1.91/1] w-full rounded-lg overflow-hidden bg-slate-200">
-                    <img src="https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=400&h=210&q=80" alt="Gadgets & Tecnologia" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="text-[11px] font-bold text-slate-900 truncate">📱 Gadgets & Tecnologia</div>
-                  <div className="text-[10px] text-emerald-600 font-semibold">112 KB • Aprovado</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageUrl('https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&h=630&q=85');
-                    setImageSizeKb(98);
-                    onShowToast('Banner Casa & Cozinha selecionado! (98 KB)');
-                  }}
-                  className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col gap-1.5 ${
-                    imageUrl.includes('photo-1513694203232') ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
-                  }`}
-                >
-                  <div className="aspect-[1.91/1] w-full rounded-lg overflow-hidden bg-slate-200">
-                    <img src="https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&h=210&q=80" alt="Casa & Organização" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="text-[11px] font-bold text-slate-900 truncate">🏠 Casa & Organização</div>
-                  <div className="text-[10px] text-emerald-600 font-semibold">98 KB • Aprovado</div>
-                </button>
               </div>
             </div>
 
@@ -688,15 +598,6 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
 
             {/* Test & Action Buttons */}
             <div className="pt-2 space-y-2.5">
-              <button
-                type="button"
-                onClick={handleSaveSeo}
-                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 cursor-pointer transition-all active:scale-98"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>Salvar Imagem e Dados de SEO</span>
-              </button>
-
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -751,10 +652,25 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
               Esse aviso no Depurador do Facebook ocorre quando a URL da imagem não pode ser alcançada ou retorna erro 404 (página HTML de erro). O Facebook espera receber um cabeçalho <code>image/jpeg</code> e rejeita páginas de texto/HTML.
             </p>
             <p className="text-[11px] text-blue-900/90 leading-relaxed font-semibold">
-              ✅ <strong>Solução Rápida:</strong> Escolha uma das <strong>Imagens Prontas & 100% Aprovadas</strong> acima (elas estão em CDN global de altíssima velocidade e sempre respondem com <code>image/jpeg</code> 200 OK), clique em <strong>Salvar Imagem de SEO</strong> e no Facebook Debugger clique no botão <strong>&quot;Depurar Novamente&quot; (Scrape Again)</strong>.
+              ✅ <strong>Dica:</strong> Após carregar sua imagem <code>seo.jpeg</code> e clicar em <strong>Salvar Alterações</strong> abaixo, acesse o Depurador do Facebook e clique no botão <strong>&quot;Depurar Novamente&quot; (Scrape Again)</strong> para atualizar o cache.
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Botão Salvar Alterações no Final */}
+      <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <p className="text-xs text-slate-500">
+          As configurações de SEO e a imagem <code>/src/assets/images/seo.jpeg</code> serão aplicadas ao salvar.
+        </p>
+        <button
+          type="button"
+          onClick={handleSaveSeo}
+          className="w-full sm:w-auto py-3.5 px-8 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 cursor-pointer transition-all active:scale-95"
+        >
+          <CheckCircle className="w-5 h-5" />
+          <span>Salvar Alterações</span>
+        </button>
       </div>
     </div>
   );
