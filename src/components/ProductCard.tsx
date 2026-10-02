@@ -86,41 +86,48 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         {/* Store Badge (top left) */}
-        <div className="absolute top-2.5 left-2.5 z-10">
+        <div className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 z-10">
           <span
             style={{
               backgroundColor: storeConfig.bg,
               color: storeConfig.text,
               borderColor: storeConfig.border,
             }}
-            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold border shadow-xs backdrop-blur-xs"
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-bold border shadow-xs backdrop-blur-xs"
           >
             <StoreLogo store={product.store} size="xs" />
-            <span className="text-[11px] font-bold">{product.store}</span>
+            <span className="hidden sm:inline text-[11px] font-bold">{product.store}</span>
           </span>
         </div>
 
-        {/* Value/Feature Badge (top right) */}
-        <div className="absolute top-2.5 right-2.5 z-10 flex flex-col items-end gap-1">
-          {product.isCollection && (
-            <span className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-md shadow-indigo-500/30 flex items-center gap-1 uppercase tracking-wider">
-              <Layers className="w-3 h-3 text-white" />
-              <span>Coleção / Vitrine</span>
+        {/* Value/Feature Badge (top right) - Single prioritized, compact badge on mobile */}
+        <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-10 flex flex-col items-end gap-1">
+          {product.isCollection ? (
+            <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg text-[9px] sm:text-[11px] font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xs sm:shadow-md shadow-indigo-500/30 flex items-center gap-1 uppercase tracking-wider">
+              <Layers className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
+              <span className="hidden sm:inline">Coleção / Vitrine</span>
+              <span className="sm:hidden">Vitrine</span>
             </span>
-          )}
-          {isTopFeaturedArea ? (
-            <span className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white shadow-md shadow-orange-500/40 flex items-center gap-1 uppercase tracking-wider">
-              <Star className="w-3 h-3 fill-white text-white" />
-              <span>Top Destaque</span>
+          ) : isTopFeaturedArea ? (
+            <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg text-[9px] sm:text-[11px] font-black bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white shadow-xs sm:shadow-md shadow-orange-500/40 flex items-center gap-1 uppercase tracking-wider">
+              <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white" />
+              <span className="hidden sm:inline">Top Destaque</span>
+              <span className="sm:hidden">Top</span>
             </span>
           ) : product.isFeatured ? (
-            <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-extrabold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm flex items-center gap-1">
-              <Star className="w-3 h-3 fill-white text-white" />
+            <span className="px-2 py-0.5 rounded-md sm:rounded-lg text-[9px] sm:text-[11px] font-extrabold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs flex items-center gap-1">
+              <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white" />
               <span>Destaque</span>
             </span>
+          ) : product.badges && product.badges.length > 0 && product.badges[0] !== 'Destaque' ? (
+            <span className="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[11px] font-bold bg-slate-900/80 backdrop-blur-xs text-white">
+              {product.badges[0]}
+            </span>
           ) : null}
-          {product.badges && product.badges.length > 0 && product.badges[0] !== 'Destaque' && (
-            <span className="px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold bg-slate-900/80 backdrop-blur-xs text-white">
+
+          {/* Secondary badge shown only on desktop (sm+) to avoid obscuring the mobile photo */}
+          {!product.isCollection && isTopFeaturedArea && product.badges && product.badges.length > 0 && product.badges[0] !== 'Destaque' && (
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900/80 backdrop-blur-xs text-white">
               {product.badges[0]}
             </span>
           )}
@@ -135,8 +142,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         )}
 
-        {/* Quick view overlay hint on hover */}
-        <div className="absolute inset-x-0 bottom-0 pb-2.5 pt-8 bg-gradient-to-t from-slate-950/75 via-slate-950/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none px-3 text-center z-10">
+        {/* Quick view overlay hint on hover - ONLY on desktop (sm:flex), hidden on mobile touch screens */}
+        <div className="hidden sm:flex absolute inset-x-0 bottom-0 pb-2.5 pt-8 bg-gradient-to-t from-slate-950/75 via-slate-950/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center pointer-events-none px-3 text-center z-10">
           <span className="bg-white/95 text-slate-900 px-3 py-1 rounded-full text-[11px] font-bold shadow-md flex items-center gap-1.5 transform translate-y-1 group-hover:translate-y-0 transition-transform">
             {product.isCollection ? (
               <>
@@ -156,9 +163,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Card Content Area */}
       <div className="p-2 sm:p-4 flex-1 flex flex-col justify-between">
         <div>
-          {/* Metadata Row: Category & Social Proof */}
-          <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-500 mb-1 sm:mb-1.5">
-            <span className="font-semibold text-orange-600 truncate mr-1">{product.category}</span>
+          {/* Metadata Row: Category, Secondary Promo Tag & Social Proof */}
+          <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-500 mb-1 sm:mb-1.5 gap-1">
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="font-semibold text-orange-600 truncate mr-0.5">{product.category}</span>
+              {/* Mobile badge indicator when multiple badges exist, cleanly placed below image */}
+              {(isTopFeaturedArea || product.isCollection) && product.badges && product.badges.length > 0 && product.badges[0] !== 'Destaque' && (
+                <span className="sm:hidden px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-600 shrink-0">
+                  {product.badges[0]}
+                </span>
+              )}
+            </div>
             {product.rating && (
               <div className="flex items-center gap-1 text-slate-600 font-medium shrink-0">
                 <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-amber-400 text-amber-400" />
