@@ -13,11 +13,13 @@ import {
   Globe,
   Info,
   ShieldCheck,
-  Check
+  Check,
+  Download
 } from 'lucide-react';
 import { SiteConfig, Banner, SeoConfig } from '../types';
 import { WhatsAppIcon } from './WhatsAppButton';
 import { updatePageSEO } from '../utils/seo';
+import { uploadSeoImage } from '../services/imageUpload';
 
 interface SeoSettingsPanelProps {
   siteConfig: SiteConfig;
@@ -127,32 +129,63 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
         const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         const kb = Math.round((compressedDataUrl.length * 3) / 4 / 1024);
 
-        // Upload to /api/upload-seo to save permanently as src/assets/images/seo.jpg
-        fetch('/api/upload-seo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: compressedDataUrl })
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            setIsCompressing(false);
-            if (data.success) {
-              setImageUrl(data.url);
-              setImageSizeKb(kb);
-              setSavedFilePath('src/assets/images/seo.jpg');
-              onShowToast(`✅ Imagem salva com sucesso na pasta ASSETS - IMAGES como seo.jpg (${kb} KB)!`);
-            } else {
-              setImageUrl(compressedDataUrl);
-              setImageSizeKb(kb);
-              onShowToast(`Imagem carregada (${kb} KB)!`);
-            }
-          })
-          .catch(() => {
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
             setIsCompressing(false);
             setImageUrl(compressedDataUrl);
             setImageSizeKb(kb);
-            onShowToast(`Imagem carregada (${kb} KB)!`);
-          });
+            return;
+          }
+
+          // 1. Upload to Firebase Storage for permanent public CDN URL (works everywhere, including Vercel)
+          try {
+            const uploadRes = await uploadSeoImage(blob);
+            if (uploadRes.success && uploadRes.url) {
+              setIsCompressing(false);
+              setImageUrl(uploadRes.url);
+              setImageSizeKb(kb);
+              setSavedFilePath('Nuvem Storage (CDN Permanente)');
+              onShowToast(`✅ Imagem seo.jpg salva na nuvem com sucesso (${kb} KB)!`);
+
+              // Also sync to dev server if available
+              fetch('/api/upload-seo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64: compressedDataUrl })
+              }).catch(() => {});
+              return;
+            }
+          } catch (storageErr) {
+            console.warn('Firebase Storage upload failed, trying local endpoint:', storageErr);
+          }
+
+          // 2. Upload to /api/upload-seo to save permanently as src/assets/images/seo.jpg (dev/local server)
+          fetch('/api/upload-seo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageBase64: compressedDataUrl })
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              setIsCompressing(false);
+              if (data.success) {
+                setImageUrl(data.url);
+                setImageSizeKb(kb);
+                setSavedFilePath('src/assets/images/seo.jpg');
+                onShowToast(`✅ Imagem salva com sucesso como seo.jpg (${kb} KB)!`);
+              } else {
+                setImageUrl('/src/assets/images/seo.jpg');
+                setImageSizeKb(kb);
+                onShowToast(`Imagem carregada (${kb} KB)!`);
+              }
+            })
+            .catch(() => {
+              setIsCompressing(false);
+              setImageUrl('/src/assets/images/seo.jpg');
+              setImageSizeKb(kb);
+              onShowToast(`Imagem pronta (${kb} KB)!`);
+            });
+        }, 'image/jpeg', 0.85);
       };
 
       img.onerror = () => {
@@ -164,6 +197,16 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     };
 
     reader.readAsDataURL(file);
+  };
+
+  const handleDownloadSeoJpg = () => {
+    const a = document.createElement('a');
+    a.href = imageUrl.startsWith('data:') || imageUrl.startsWith('http') ? imageUrl : '/src/assets/images/seo.jpg';
+    a.download = 'seo.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    onShowToast('📥 Download do arquivo seo.jpg iniciado!');
   };
 
   const handleSaveSeo = () => {
@@ -192,7 +235,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     }, null);
 
     onUpdateConfig(updatedConfig);
-    onShowToast('✅ Imagem salva na pasta ASSETS - IMAGES como seo.jpg e configurações de SEO atualizadas!');
+    onShowToast('✅ Imagem salva e configurações de SEO atualizadas com sucesso!');
   };
 
   const handleCopyLink = () => {
@@ -327,7 +370,17 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                   title="Usar seo.jpg da pasta ASSETS - IMAGES"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Usar seo.jpg Atual</span>
+                  <span>Usar seo.jpg Padrão</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadSeoJpg}
+                  className="py-3 px-4 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-850 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-200"
+                  title="Baixar arquivo seo.jpg otimizado para o seu computador"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Baixar seo.jpg</span>
                 </button>
               </div>
 

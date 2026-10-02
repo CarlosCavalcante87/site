@@ -40,3 +40,25 @@ export const uploadImageFile = async (
     return { success: false, error: 'Falha ao enviar a imagem. Tente novamente.' };
   }
 };
+
+/**
+ * Uploads or overwrites the permanent SEO image at seo/seo.jpg in Firebase Storage,
+ * returning a globally-accessible CDN URL that works on Vercel, WhatsApp, and Facebook.
+ */
+export const uploadSeoImage = async (
+  blobOrFile: Blob | File
+): Promise<UploadImageResult> => {
+  try {
+    const storageRef = ref(storage, 'seo/seo.jpg');
+    const snapshot = await uploadBytes(storageRef, blobOrFile, { 
+      contentType: 'image/jpeg',
+      cacheControl: 'public,max-age=3600'
+    });
+    const url = await getDownloadURL(snapshot.ref);
+    return { success: true, url };
+  } catch (error: any) {
+    console.warn('Firebase Storage upload for SEO failed:', error);
+    return { success: false, error: error?.message || 'Falha no upload' };
+  }
+};
+
