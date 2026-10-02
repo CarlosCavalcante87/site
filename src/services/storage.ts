@@ -197,10 +197,10 @@ export const getStoredSiteConfig = (): SiteConfig => {
     if (
       seo.ogImageUrl === '/images/seo.jpg' ||
       seo.ogImageUrl === '/images/seo.jpeg' ||
-      seo.ogImageUrl === '/src/assets/images/seo.jpg' ||
+      seo.ogImageUrl === '/src/assets/images/seo.jpeg' ||
       seo.ogImageUrl === '/og-image.jpg'
     ) {
-      seo.ogImageUrl = '/src/assets/images/seo.jpeg';
+      seo.ogImageUrl = '/src/assets/images/seo.jpg';
     }
 
     return {

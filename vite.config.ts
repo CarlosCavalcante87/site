@@ -56,8 +56,8 @@ function seoUploadPlugin(): Plugin {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({
             success: true,
-            url: `/src/assets/images/seo.jpeg?v=${Date.now()}`,
-            path: 'src/assets/images/seo.jpeg',
+            url: `/src/assets/images/seo.jpg?v=${Date.now()}`,
+            path: 'src/assets/images/seo.jpg',
             sizeBytes: buffer.length
           }));
         } catch (err: any) {

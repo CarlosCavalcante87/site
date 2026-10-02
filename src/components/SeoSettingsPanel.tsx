@@ -41,7 +41,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     keywords: 'achados do dia, achadinhos, promoções, cupons de desconto, shopee, mercado livre, amazon, shein, ofertas relâmpago',
   };
 
-  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || '/src/assets/images/seo.jpeg');
+  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || '/src/assets/images/seo.jpg');
   const [title, setTitle] = useState<string>(currentSeo.ogTitle || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet');
   const [description, setDescription] = useState<string>(currentSeo.ogDescription || 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.');
   const [keywords, setKeywords] = useState<string>(currentSeo.keywords || 'achados do dia, achadinhos, promoções, cupons');
@@ -50,7 +50,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
   const [imageSizeKb, setImageSizeKb] = useState<number | null>(null);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
-  const [savedFilePath, setSavedFilePath] = useState<string>('src/assets/images/seo.jpeg');
+  const [savedFilePath, setSavedFilePath] = useState<string>('src/assets/images/seo.jpg');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,7 +70,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     return null;
   };
 
-  // Compress & Optimize Image using client-side canvas and upload to server as seo.jpeg in src/assets/images
+  // Compress & Optimize Image using client-side canvas and upload to server as seo.jpg in src/assets/images
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -127,7 +127,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
         const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         const kb = Math.round((compressedDataUrl.length * 3) / 4 / 1024);
 
-        // Upload to /api/upload-seo to save permanently as src/assets/images/seo.jpeg
+        // Upload to /api/upload-seo to save permanently as src/assets/images/seo.jpg
         fetch('/api/upload-seo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -139,8 +139,8 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
             if (data.success) {
               setImageUrl(data.url);
               setImageSizeKb(kb);
-              setSavedFilePath('src/assets/images/seo.jpeg');
-              onShowToast(`✅ Imagem salva com sucesso na pasta ASSETS - IMAGES como seo.jpeg (${kb} KB)!`);
+              setSavedFilePath('src/assets/images/seo.jpg');
+              onShowToast(`✅ Imagem salva com sucesso na pasta ASSETS - IMAGES como seo.jpg (${kb} KB)!`);
             } else {
               setImageUrl(compressedDataUrl);
               setImageSizeKb(kb);
@@ -168,8 +168,8 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
 
   const handleSaveSeo = () => {
     const cleanOgUrl = imageUrl.trim().startsWith('/src/assets/images/seo')
-      ? '/src/assets/images/seo.jpeg'
-      : (imageUrl.trim().split('?')[0] || '/src/assets/images/seo.jpeg');
+      ? '/src/assets/images/seo.jpg'
+      : (imageUrl.trim().split('?')[0] || '/src/assets/images/seo.jpg');
 
     const updatedSeo: SeoConfig = {
       ogImageUrl: cleanOgUrl,
@@ -192,7 +192,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
     }, null);
 
     onUpdateConfig(updatedConfig);
-    onShowToast('✅ Imagem salva na pasta ASSETS - IMAGES como seo.jpeg e configurações de SEO atualizadas!');
+    onShowToast('✅ Imagem salva na pasta ASSETS - IMAGES como seo.jpg e configurações de SEO atualizadas!');
   };
 
   const handleCopyLink = () => {
@@ -290,7 +290,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                 </code>
               </div>
               <span className="text-[11px] text-indigo-700 font-bold bg-indigo-100/80 px-2.5 py-0.5 rounded-lg border border-indigo-200/60 w-fit">
-                Salvo automaticamente como seo.jpeg
+                Salvo automaticamente como seo.jpg
               </span>
             </div>
 
@@ -312,22 +312,22 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                   className="flex-1 py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>{isCompressing ? 'Salvando em ASSETS - IMAGES...' : 'Fazer Upload para ASSETS - IMAGES (seo.jpeg)'}</span>
+                  <span>{isCompressing ? 'Salvando em ASSETS - IMAGES...' : 'Fazer Upload para ASSETS - IMAGES (seo.jpg)'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    setImageUrl('/src/assets/images/seo.jpeg');
+                    setImageUrl('/src/assets/images/seo.jpg');
                     setImageSizeKb(95);
-                    setSavedFilePath('src/assets/images/seo.jpeg');
-                    onShowToast('Imagem seo.jpeg selecionada!');
+                    setSavedFilePath('src/assets/images/seo.jpg');
+                    onShowToast('Imagem seo.jpg selecionada!');
                   }}
                   className="py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  title="Usar seo.jpeg da pasta ASSETS - IMAGES"
+                  title="Usar seo.jpg da pasta ASSETS - IMAGES"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Usar seo.jpeg Atual</span>
+                  <span>Usar seo.jpg Atual</span>
                 </button>
               </div>
 
@@ -652,7 +652,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
               Esse aviso no Depurador do Facebook ocorre quando a URL da imagem não pode ser alcançada ou retorna erro 404 (página HTML de erro). O Facebook espera receber um cabeçalho <code>image/jpeg</code> e rejeita páginas de texto/HTML.
             </p>
             <p className="text-[11px] text-blue-900/90 leading-relaxed font-semibold">
-              ✅ <strong>Dica:</strong> Após carregar sua imagem <code>seo.jpeg</code> e clicar em <strong>Salvar Alterações</strong> abaixo, acesse o Depurador do Facebook e clique no botão <strong>&quot;Depurar Novamente&quot; (Scrape Again)</strong> para atualizar o cache.
+              ✅ <strong>Dica:</strong> Após carregar sua imagem <code>seo.jpg</code> e clicar em <strong>Salvar Alterações</strong> abaixo, acesse o Depurador do Facebook e clique no botão <strong>&quot;Depurar Novamente&quot; (Scrape Again)</strong> para atualizar o cache.
             </p>
           </div>
         </div>
@@ -661,7 +661,7 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
       {/* Botão Salvar Alterações no Final */}
       <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <p className="text-xs text-slate-500">
-          As configurações de SEO e a imagem <code>/src/assets/images/seo.jpeg</code> serão aplicadas ao salvar.
+          As configurações de SEO e a imagem <code>/src/assets/images/seo.jpg</code> serão aplicadas ao salvar.
         </p>
         <button
           type="button"
