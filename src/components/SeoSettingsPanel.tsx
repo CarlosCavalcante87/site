@@ -34,30 +34,42 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
   onUpdateConfig,
   onShowToast,
 }) => {
-  const DEFAULT_CDN_IMAGE = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&h=630&q=85';
+  const DEFAULT_CDN_IMAGE = 'https://achados-cctech.vercel.app/images/seo.jpg';
 
   const currentSeo = siteConfig.seo || {
     ogImageUrl: DEFAULT_CDN_IMAGE,
-    ogTitle: 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
+    ogTitle: 'Melhores Ofertas e Achadinhos da Internet',
     ogDescription: 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.',
     keywords: 'achados do dia, achadinhos, promoções, cupons de desconto, shopee, mercado livre, amazon, shein, ofertas relâmpago',
   };
 
-  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || '/images/seo.jpg');
-  const [title, setTitle] = useState<string>(currentSeo.ogTitle || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet');
+  const [imageUrl, setImageUrl] = useState<string>(currentSeo.ogImageUrl || DEFAULT_CDN_IMAGE);
+  const [title, setTitle] = useState<string>(currentSeo.ogTitle || 'Melhores Ofertas e Achadinhos da Internet');
   const [description, setDescription] = useState<string>(currentSeo.ogDescription || 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.');
-  const [keywords, setKeywords] = useState<string>(currentSeo.keywords || 'achados do dia, achadinhos, promoções, cupons');
+  const [keywords, setKeywords] = useState<string>(currentSeo.keywords || 'achados do dia, achadinhos, promoções, cupons de desconto, shopee, mercado livre, amazon, shein, ofertas relâmpago');
   
+  // Sync state if siteConfig changes from cloud
+  React.useEffect(() => {
+    if (siteConfig.seo) {
+      if (siteConfig.seo.ogTitle) setTitle(siteConfig.seo.ogTitle);
+      if (siteConfig.seo.ogDescription) setDescription(siteConfig.seo.ogDescription);
+      if (siteConfig.seo.keywords) setKeywords(siteConfig.seo.keywords);
+      if (siteConfig.seo.ogImageUrl) setImageUrl(siteConfig.seo.ogImageUrl);
+    }
+  }, [siteConfig.seo]);
+
   const [previewTab, setPreviewTab] = useState<'whatsapp' | 'facebook' | 'google'>('whatsapp');
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
-  const [imageSizeKb, setImageSizeKb] = useState<number | null>(null);
+  const [imageSizeKb, setImageSizeKb] = useState<number | null>(107);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [savedFilePath, setSavedFilePath] = useState<string>('public/images/seo.jpg');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const currentDomain = typeof window !== 'undefined' ? window.location.origin : '';
-  const displayDomain = currentDomain ? currentDomain.replace(/^https?:\/\//, '').replace(/\/$/, '') : 'achadosdodia.com.br';
+  const currentDomain = (typeof window !== 'undefined' && !window.location.origin.includes('localhost') && !window.location.origin.includes('ais-'))
+    ? window.location.origin
+    : 'https://achados-cctech.vercel.app';
+  const displayDomain = 'achados-cctech.vercel.app';
 
   // Calculate image size helper
   const calculateKb = (str: string) => {
@@ -196,14 +208,14 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
   };
 
   const handleSaveSeo = () => {
-    const cleanOgUrl = (imageUrl.trim().startsWith('/images/seo') || imageUrl.trim().startsWith('/src/assets/images/seo'))
-      ? '/images/seo.jpg'
-      : (imageUrl.trim().split('?')[0] || '/images/seo.jpg');
+    const cleanOgUrl = (imageUrl.trim().startsWith('/images/seo') || imageUrl.trim().startsWith('/src/assets/images/seo') || imageUrl.includes('achados-cctech.vercel.app/images/seo.jpg'))
+      ? 'https://achados-cctech.vercel.app/images/seo.jpg'
+      : (imageUrl.trim().split('?')[0] || 'https://achados-cctech.vercel.app/images/seo.jpg');
 
     const updatedSeo: SeoConfig = {
       ogImageUrl: cleanOgUrl,
-      ogTitle: title.trim() || 'Achados do Dia – Melhores Ofertas, Cupons e Achadinhos da Internet',
-      ogDescription: description.trim() || 'Encontre os melhores achadinhos virais com links seguros.',
+      ogTitle: title.trim() || 'Melhores Ofertas e Achadinhos da Internet',
+      ogDescription: description.trim() || 'Encontre os melhores achadinhos virais, cupons de desconto e promoções oficiais da Shopee, Mercado Livre, Amazon e Shein com links 100% verificados e seguros.',
       keywords: keywords.trim(),
     };
 
@@ -429,63 +441,6 @@ export const SeoSettingsPanel: React.FC<SeoSettingsPanelProps> = ({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* 2. Textos do Link (Título e Descrição) */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Share2 className="w-5 h-5 text-indigo-600" />
-              <span>2. Textos do Compartilhamento</span>
-            </h3>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Título do Link (og:title)
-                </label>
-                <span className={`text-[10px] font-mono ${title.length > 70 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
-                  {title.length} / 60 caracteres recomendados
-                </span>
-              </div>
-              <input 
-                type="text" 
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Achados do Dia – Melhores Ofertas e Cupons da Internet"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-bold focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Descrição Curta (og:description)
-                </label>
-                <span className={`text-[10px] font-mono ${description.length > 160 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
-                  {description.length} / 150 caracteres recomendados
-                </span>
-              </div>
-              <textarea 
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex: Encontre os melhores achadinhos virais com links verificados e seguros."
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500 leading-relaxed resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Palavras-chave SEO (Meta Keywords)
-              </label>
-              <input 
-                type="text" 
-                value={keywords}
-                onChange={(e) => setKeywords(e.target.value)}
-                placeholder="achadinhos, ofertas, cupons, shopee, amazon, mercado livre"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
           </div>
         </div>
 
