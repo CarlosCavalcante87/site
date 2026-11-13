@@ -34,9 +34,9 @@ service cloud.firestore {
     function isValidProduct(data) {
       return data.keys().hasAll(['id', 'title', 'store', 'affiliateUrl']) &&
         data.id is string && data.id.size() <= 128 &&
-        data.title is string && data.title.size() <= 300 &&
+        data.title is string && data.title.size() <= 500 &&
         data.store is string && data.store.size() <= 100 &&
-        data.affiliateUrl is string && data.affiliateUrl.size() <= 2048 &&
+        data.affiliateUrl is string && data.affiliateUrl.size() <= 4096 &&
         (!('order' in data) || data.order is number) &&
         (!('price' in data) || data.price is number || data.price is string) &&
         (!('originalPrice' in data) || data.originalPrice is number || data.originalPrice is string) &&

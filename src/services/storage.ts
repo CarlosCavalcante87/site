@@ -76,19 +76,27 @@ export const STORE_CONFIG: Record<
   },
 };
 
+let inMemoryProductsCache: Product[] | null = null;
+
 /**
- * Ensures that every product has a unique, non-repeating position (order >= 1)
+ * Ensures that every product is unique by ID, has a unique, non-repeating position (order >= 1),
  * and returns the list sorted by order ascending.
  */
 export const normalizeProductOrders = (products: Product[]): Product[] => {
+  const seenIds = new Set<string>();
   const used = new Set<number>();
   let nextPos = 1;
 
-  const list = products.map((p) => ({ ...p }));
+  const list: Product[] = [];
+  for (const p of products) {
+    if (!p || !p.id || seenIds.has(p.id)) continue;
+    seenIds.add(p.id);
+    list.push({ ...p });
+  }
 
   // First keep products that already have a valid, unique order > 0
   for (const p of list) {
-    if (typeof p.order === 'number' && p.order > 0 && !used.has(p.order)) {
+    if (typeof p.order === 'number' && !isNaN(p.order) && p.order > 0 && !used.has(p.order)) {
       used.add(p.order);
     } else {
       p.order = undefined as any;
@@ -97,7 +105,7 @@ export const normalizeProductOrders = (products: Product[]): Product[] => {
 
   // Fill in any products that were undefined or duplicate
   for (const p of list) {
-    if (typeof p.order !== 'number' || p.order <= 0) {
+    if (typeof p.order !== 'number' || isNaN(p.order) || p.order <= 0) {
       while (used.has(nextPos)) {
         nextPos++;
       }
@@ -111,28 +119,41 @@ export const normalizeProductOrders = (products: Product[]): Product[] => {
 };
 
 export const getStoredProducts = (): Product[] => {
+  if (inMemoryProductsCache !== null) {
+    return normalizeProductOrders(inMemoryProductsCache);
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
     if (!raw) {
       const normalized = normalizeProductOrders(INITIAL_PRODUCTS);
-      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(normalized));
+      inMemoryProductsCache = normalized;
+      try {
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(normalized));
+      } catch {
+        // Ignore quota error; inMemoryProductsCache preserves state
+      }
       return normalized;
     }
     const parsed = JSON.parse(raw);
-    const validArray = Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_PRODUCTS;
+    const validArray = Array.isArray(parsed) ? parsed : INITIAL_PRODUCTS;
     const normalized = normalizeProductOrders(validArray);
+    inMemoryProductsCache = normalized;
     return normalized;
   } catch (error) {
     console.error('Failed to load products from localStorage', error);
-    return normalizeProductOrders(INITIAL_PRODUCTS);
+    const normalized = normalizeProductOrders(INITIAL_PRODUCTS);
+    inMemoryProductsCache = normalized;
+    return normalized;
   }
 };
 
 export const saveProducts = (products: Product[]): void => {
+  const normalized = normalizeProductOrders(products);
+  inMemoryProductsCache = normalized;
   try {
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(normalized));
   } catch (error) {
-    console.error('Failed to save products to localStorage', error);
+    console.error('Failed to save products to localStorage (using in-memory cache)', error);
   }
 };
 
@@ -291,7 +312,7 @@ export const addProduct = (
   const id = `prod-${Date.now()}`;
 
   let targetOrder = newProductData.order;
-  if (typeof targetOrder !== 'number' || targetOrder < 1) {
+  if (typeof targetOrder !== 'number' || isNaN(targetOrder) || targetOrder < 1) {
     targetOrder = current.reduce((max, p) => Math.max(max, p.order || 0), 0) + 1;
   }
 
@@ -308,7 +329,7 @@ export const addProduct = (
 
   const updated = normalizeProductOrders([newProduct, ...current]);
   saveProducts(updated);
-  return newProduct;
+  return updated.find((p) => p.id === id) || newProduct;
 };
 
 export const updateProduct = (id: string, updates: Partial<Product>): Product | null => {
@@ -328,11 +349,14 @@ export const updateProduct = (id: string, updates: Partial<Product>): Product | 
   if ('originalPrice' in updates && (updates.originalPrice === undefined || updates.originalPrice === null)) {
     delete updatedProduct.originalPrice;
   }
+  if ('collectionButtonText' in updates && (!updates.collectionButtonText || !updates.collectionButtonText.trim())) {
+    delete updatedProduct.collectionButtonText;
+  }
 
   current[index] = updatedProduct;
   const normalized = normalizeProductOrders(current);
   saveProducts(normalized);
-  return updatedProduct;
+  return normalized.find((p) => p.id === id) || updatedProduct;
 };
 
 export const deleteProduct = (id: string): boolean => {

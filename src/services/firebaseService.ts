@@ -73,7 +73,12 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): FirestoreErrorInfo {
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null,
+  shouldThrow = false
+): FirestoreErrorInfo {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -90,18 +95,21 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.warn('Firestore Operation Notice: ', JSON.stringify(errInfo));
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  if (shouldThrow) {
+    throw new Error(JSON.stringify(errInfo));
+  }
   return errInfo;
 }
 
 /**
- * Recursively removes any keys with `undefined` values from an object,
+ * Recursively removes any keys with `undefined` or `NaN` values from an object,
  * preventing FirebaseError: Unsupported field value: undefined.
  */
 export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Partial<T> {
   const clean: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
+    if (value !== undefined && !(typeof value === 'number' && Number.isNaN(value))) {
       if (
         value !== null &&
         typeof value === 'object' &&
@@ -315,7 +323,7 @@ export function subscribeToSiteConfig(
  * Cloud CRUD operations for Products
  */
 export async function addProductToCloud(product: Product): Promise<void> {
-  const current = getLocalProducts();
+  const current = getLocalProducts().filter((p) => p.id !== product.id);
   const normalized = normalizeProductOrders([product, ...current]);
   saveLocalProducts(normalized);
 
@@ -323,12 +331,15 @@ export async function addProductToCloud(product: Product): Promise<void> {
     const cleanData = sanitizeForFirestore(product);
     await setDoc(doc(db, PRODUCTS_COL, product.id), cleanData);
   } catch (err) {
-    handleFirestoreError(err, OperationType.CREATE, `${PRODUCTS_COL}/${product.id}`);
+    // Roll back local cache if cloud save fails so UI stays truthful
+    saveLocalProducts(current);
+    handleFirestoreError(err, OperationType.CREATE, `${PRODUCTS_COL}/${product.id}`, true);
   }
 }
 
 export async function updateProductInCloud(id: string, updates: Partial<Product>): Promise<void> {
-  const current = getLocalProducts();
+  const previous = getLocalProducts();
+  const current = previous.map((p) => ({ ...p }));
   const index = current.findIndex((p) => p.id === id);
   if (index !== -1) {
     current[index] = { ...current[index], ...updates };
@@ -337,6 +348,9 @@ export async function updateProductInCloud(id: string, updates: Partial<Product>
     }
     if ('originalPrice' in updates && (updates.originalPrice === undefined || updates.originalPrice === null)) {
       delete current[index].originalPrice;
+    }
+    if ('collectionButtonText' in updates && (!updates.collectionButtonText || !updates.collectionButtonText.trim())) {
+      delete current[index].collectionButtonText;
     }
     saveLocalProducts(normalizeProductOrders(current));
   }
@@ -349,10 +363,14 @@ export async function updateProductInCloud(id: string, updates: Partial<Product>
     if ('originalPrice' in updates && (updates.originalPrice === undefined || updates.originalPrice === null)) {
       firestoreUpdates.originalPrice = deleteField();
     }
+    if ('collectionButtonText' in updates && (!updates.collectionButtonText || !updates.collectionButtonText.trim())) {
+      firestoreUpdates.collectionButtonText = deleteField();
+    }
     const cleanUpdates = sanitizeForFirestore(firestoreUpdates);
     await updateDoc(doc(db, PRODUCTS_COL, id), cleanUpdates);
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${id}`);
+    saveLocalProducts(previous);
+    handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${id}`, true);
   }
 }
 
@@ -366,18 +384,20 @@ export async function swapProductOrdersInCloud(
       await updateDoc(doc(db, PRODUCTS_COL, p2.id), { order: p2.order, updatedAt: new Date().toISOString() });
     }
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${p1.id}`);
+    handleFirestoreError(err, OperationType.UPDATE, `${PRODUCTS_COL}/${p1.id}`, true);
   }
 }
 
 export async function deleteProductFromCloud(id: string): Promise<void> {
-  const current = getLocalProducts().filter((p) => p.id !== id);
+  const previous = getLocalProducts();
+  const current = previous.filter((p) => p.id !== id);
   saveLocalProducts(normalizeProductOrders(current));
 
   try {
     await deleteDoc(doc(db, PRODUCTS_COL, id));
   } catch (err) {
-    handleFirestoreError(err, OperationType.DELETE, `${PRODUCTS_COL}/${id}`);
+    saveLocalProducts(previous);
+    handleFirestoreError(err, OperationType.DELETE, `${PRODUCTS_COL}/${id}`, true);
   }
 }
 

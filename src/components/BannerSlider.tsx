@@ -116,7 +116,9 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
             referrerPolicy="no-referrer"
             onError={(e) => {
               const target = e.currentTarget;
-              target.src = '/og-image.jpg';
+              if (target.dataset.fallbackApplied) return;
+              target.dataset.fallbackApplied = '1';
+              target.src = '/images/seo.jpg';
             }}
           />
         </div>

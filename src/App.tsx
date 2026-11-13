@@ -253,9 +253,9 @@ export default function App() {
     return result;
   }, [products, searchQuery, selectedCategory, selectedStore, selectedBadge, onlyFeatured, sortBy]);
 
-  // Achadinhos marcados no Admin com "Exibir este achadinho com destaque prioritário na página inicial"
+  // Achadinhos marcados no Admin como Destaque ou Coleção / Vitrine
   const featuredProducts = useMemo(() => {
-    return products.filter((p) => p.isFeatured);
+    return products.filter((p) => p.isFeatured || p.isCollection);
   }, [products]);
 
   // Selected product object for Detail view
@@ -272,7 +272,7 @@ export default function App() {
         description: currentProduct.description 
           ? currentProduct.description.slice(0, 160)
           : `Confira a oferta de ${currentProduct.title} na loja oficial ${currentProduct.store}. Link 100% verificado com desconto!`,
-        image: currentProduct.images?.[0] || '/images/banner_achadinhos_virais_1790121462152.jpg',
+        image: currentProduct.images?.[0] || '/images/seo.jpg',
         url: typeof window !== 'undefined' ? `${window.location.origin}/#produto/${currentProduct.id}` : ''
       }, currentProduct);
     } else {
@@ -303,17 +303,13 @@ export default function App() {
     setSortBy('featured');
   };
 
-  // Mobile Grid Class based on Admin Configuration (Dupla vs Simples)
-  // When Double View is active on mobile: use tighter gap (gap-2 sm:gap-6) and maximized width
-  // to give maximum possible width to both cards on mobile screens!
-  const isMobileDouble = siteConfig.mobileDoubleColumns !== false;
-  const productsGridClass = isMobileDouble
-    ? 'grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 sm:gap-6'
-    : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6';
-
-  const sectionPaddingClass = isMobileDouble
-    ? 'max-w-7xl mx-auto px-2 sm:px-6'
-    : 'max-w-7xl mx-auto px-3.5 sm:px-6';
+  // Mobile Grid Classes:
+  // - Destaques & Coleções (top section): 2 cards per row on mobile
+  // - Catálogo principal (below): 1 card per row on mobile
+  const featuredGridClass = 'grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 sm:gap-6';
+  const featuredSectionPaddingClass = 'max-w-7xl mx-auto px-2 sm:px-6';
+  const productsGridClass = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6';
+  const sectionPaddingClass = 'max-w-7xl mx-auto px-3.5 sm:px-6';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-slate-800 antialiased">
@@ -360,10 +356,10 @@ export default function App() {
               onSearchChange={setSearchQuery}
             />
 
-            {/* SEÇÃO EXCLUSIVA: ÁREA DE DESTAQUE PRIORITÁRIO */}
+            {/* SEÇÃO EXCLUSIVA: ÁREA DE DESTAQUE PRIORITÁRIO & COLEÇÕES */}
             {featuredProducts.length > 0 && !searchQuery && !selectedCategory && !selectedStore && !selectedBadge && !onlyFeatured && (
-              <section className={`${sectionPaddingClass} pt-4 sm:pt-6 pb-2`}>
-                <div className={`relative overflow-hidden bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-50/60 rounded-2.5xl sm:rounded-3xl border-2 border-amber-400 ${isMobileDouble ? 'p-3 sm:p-7' : 'p-4 sm:p-7'} shadow-xl shadow-amber-500/15 ring-2 ring-amber-300/40`}>
+              <section className={`${featuredSectionPaddingClass} pt-4 sm:pt-6 pb-2`}>
+                <div className="relative overflow-hidden bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-50/60 rounded-2.5xl sm:rounded-3xl border-2 border-amber-400 p-3 sm:p-7 shadow-xl shadow-amber-500/15 ring-2 ring-amber-300/40">
                   {/* Decorative ambient radial glows */}
                   <div className="absolute -top-24 -right-24 w-80 h-80 bg-gradient-to-br from-amber-400/35 to-orange-500/25 rounded-full blur-3xl pointer-events-none -z-10" />
                   <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-gradient-to-tr from-orange-400/25 to-amber-300/20 rounded-full blur-3xl pointer-events-none -z-10" />
@@ -399,7 +395,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className={`${productsGridClass} relative z-10`}>
+                  <div className={`${featuredGridClass} relative z-10`}>
                     {featuredProducts.map((product) => (
                       <ProductCard
                         key={`featured-area-${product.id}`}

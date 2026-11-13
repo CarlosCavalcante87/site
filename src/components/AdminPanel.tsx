@@ -183,7 +183,8 @@ import {
   saveBanners,
   getStoredSiteConfig,
   saveStoredSiteConfig,
-  reorderProductPosition
+  reorderProductPosition,
+  getStoredProducts
 } from '../services/storage';
 import { StoreLogo } from './StoreLogo';
 import {
@@ -468,12 +469,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productToDelete, setProductToDelete] = useState<{ id: string; title: string } | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
     store: 'Shopee' as StoreType,
     affiliateUrl: '',
-    category: categories[0]?.name || 'Organizadores',
+    category: categories[0]?.name || 'Tecnologia & Informática',
     images: [''] as string[],
     description: '',
     highlights: [''] as string[],
@@ -486,8 +488,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     rating: 4.9,
     reviewCount: 384,
     clicksCount: 1420,
-    order: products.length + 1,
+    order: products.reduce((max, p) => Math.max(max, p.order || 0), 0) + 1,
   });
+
+  // Sync default category & order if products/categories finish loading after AdminPanel mounts
+  useEffect(() => {
+    if (editingProductId) return;
+    setFormData((prev) => {
+      if (prev.title.trim() !== '') return prev;
+      let nextCategory = prev.category;
+      if (categories.length > 0 && !categories.some((c) => c.name === prev.category)) {
+        nextCategory = categories[0].name;
+      }
+      let nextOrder = prev.order;
+      const maxOrder = products.reduce((max, p) => Math.max(max, p.order || 0), 0);
+      if (maxOrder > 0 && prev.order === 1 && products.some((p) => p.order === 1)) {
+        nextOrder = maxOrder + 1;
+      }
+      if (nextCategory === prev.category && nextOrder === prev.order) return prev;
+      return { ...prev, category: nextCategory, order: nextOrder };
+    });
+  }, [categories, products, editingProductId]);
 
   // Category creation & edit state
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -1181,13 +1202,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const resetForm = () => {
     setEditingProductId(null);
-    const nextOrder = products.reduce((max, p) => Math.max(max, p.order || 0), 0) + 1;
+    const latestProducts = getStoredProducts();
+    const sourceProducts = latestProducts.length > 0 ? latestProducts : products;
+    const nextOrder = sourceProducts.reduce((max, p) => Math.max(max, p.order || 0), 0) + 1;
     setFormData({
       title: '',
       subtitle: '',
       store: 'Shopee',
       affiliateUrl: '',
-      category: categories[0]?.name || 'Organizadores',
+      category: categories[0]?.name || 'Tecnologia & Informática',
       images: [''],
       description: '',
       highlights: [''],
@@ -1251,122 +1274,171 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleSubmitProduct = (e: React.FormEvent) => {
+  const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingProduct) return;
 
-    if (!formData.title.trim()) {
+    const trimmedTitle = formData.title.trim();
+    const trimmedUrl = formData.affiliateUrl.trim();
+    const trimmedCollectionBtn = formData.collectionButtonText.trim();
+
+    if (!trimmedTitle) {
       onShowToast('Por favor, informe o título do produto.');
       return;
     }
 
-    if (!formData.affiliateUrl.trim()) {
+    if (trimmedTitle.length > 500) {
+      onShowToast('O título do produto deve ter no máximo 500 caracteres.');
+      return;
+    }
+
+    if (!trimmedUrl) {
       onShowToast('Por favor, informe o link oficial da oferta (URL de afiliado).');
       return;
     }
 
-    const cleanImages = formData.images.filter((img) => img.trim() !== '');
-    const cleanHighlights = formData.highlights.filter((h) => h.trim() !== '');
-
-    const finalImages = cleanImages.length > 0 
-      ? cleanImages 
-      : ['https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80'];
-
-    if (editingProductId) {
-      const desiredOrder = Number(formData.order) || 1;
-      const reorderRes = reorderProductPosition(editingProductId, desiredOrder);
-      if (reorderRes.swappedProduct) {
-        swapProductOrdersInCloud(
-          { id: editingProductId, order: desiredOrder },
-          { id: reorderRes.swappedProduct.id, order: reorderRes.swappedProduct.order || 1 }
-        );
-      } else {
-        swapProductOrdersInCloud({ id: editingProductId, order: desiredOrder });
-      }
-
-      const parsedOriginalPrice = formData.originalPrice !== '' && !isNaN(Number(formData.originalPrice)) ? Number(formData.originalPrice) : undefined;
-      const parsedPrice = formData.price !== '' && !isNaN(Number(formData.price)) ? Number(formData.price) : undefined;
-
-      const existingProduct = products.find((p) => p.id === editingProductId);
-      let updatedHistory = existingProduct?.priceHistory ? [...existingProduct.priceHistory] : [];
-      if (parsedPrice && (!existingProduct?.price || existingProduct.price !== parsedPrice)) {
-        updatedHistory.push({
-          date: new Date().toISOString(),
-          price: parsedPrice,
-        });
-      }
-
-      const updates: Partial<Product> = {
-        title: formData.title.trim(),
-        subtitle: formData.subtitle.trim(),
-        store: formData.store,
-        affiliateUrl: formData.affiliateUrl.trim(),
-        category: formData.category,
-        order: desiredOrder,
-        images: finalImages,
-        description: formData.description || '',
-        highlights: cleanHighlights,
-        badges: formData.badges,
-        isFeatured: formData.isFeatured,
-        isCollection: formData.isCollection,
-        collectionButtonText: formData.collectionButtonText.trim() || undefined,
-        rating: Number(formData.rating) || 4.9,
-        reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
-        clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
-      };
-
-      updates.originalPrice = parsedOriginalPrice;
-      updates.price = parsedPrice;
-      if (updatedHistory.length > 0) {
-        updates.priceHistory = updatedHistory;
-      } else if (existingProduct?.priceHistory) {
-        updates.priceHistory = existingProduct.priceHistory;
-      }
-
-      updateProduct(editingProductId, updates);
-      updateProductInCloud(editingProductId, updates);
-      onShowToast('Produto atualizado com sucesso!');
-    } else {
-      const desiredOrder = Number(formData.order) || (products.length + 1);
-      const parsedOriginalPrice = formData.originalPrice !== '' && !isNaN(Number(formData.originalPrice)) ? Number(formData.originalPrice) : undefined;
-      const parsedPrice = formData.price !== '' && !isNaN(Number(formData.price)) ? Number(formData.price) : undefined;
-
-      const newProductPayload: any = {
-        title: formData.title.trim(),
-        subtitle: formData.subtitle.trim(),
-        store: formData.store,
-        affiliateUrl: formData.affiliateUrl.trim(),
-        category: formData.category,
-        order: desiredOrder,
-        images: finalImages,
-        description: formData.description || 'Descrição detalhada do achadinho.',
-        highlights: cleanHighlights.length > 0 ? cleanHighlights : ['Produto verificado', 'Envio rápido'],
-        badges: formData.badges,
-        isFeatured: formData.isFeatured,
-        isCollection: formData.isCollection,
-        collectionButtonText: formData.collectionButtonText.trim() || undefined,
-        rating: Number(formData.rating) || 4.9,
-        reviewCount: Number(formData.reviewCount) >= 0 ? Number(formData.reviewCount) : 384,
-        clicksCount: Number(formData.clicksCount) >= 0 ? Number(formData.clicksCount) : 1420,
-        verifiedDeal: true,
-      };
-
-      if (parsedOriginalPrice !== undefined) {
-        newProductPayload.originalPrice = parsedOriginalPrice;
-      }
-      if (parsedPrice !== undefined) {
-        newProductPayload.price = parsedPrice;
-        newProductPayload.priceHistory = [{ date: new Date().toISOString(), price: parsedPrice }];
-      }
-
-      const created = addProduct(newProductPayload);
-      addProductToCloud(created);
-      onShowToast('Novo produto cadastrado com sucesso!');
+    if (trimmedUrl.length > 4096) {
+      onShowToast('O link de afiliado é muito longo (máximo de 4096 caracteres).');
+      return;
     }
 
-    resetForm();
-    onRefreshData();
-    setActiveTab('products');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (trimmedCollectionBtn.length > 200) {
+      onShowToast('O texto do botão de coleção deve ter no máximo 200 caracteres.');
+      return;
+    }
+
+    const cleanImages = formData.images.map((img) => img.trim()).filter((img) => img !== '');
+    const cleanHighlights = formData.highlights.map((h) => h.trim()).filter((h) => h !== '');
+
+    const finalImages = cleanImages.length > 0
+      ? cleanImages
+      : ['https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80'];
+
+    const resolvedCategory =
+      categories.length > 0 && !categories.some((c) => c.name === formData.category)
+        ? categories[0].name
+        : formData.category;
+
+    setIsSavingProduct(true);
+    try {
+      if (editingProductId) {
+        const existingProduct = products.find((p) => p.id === editingProductId) || getStoredProducts().find((p) => p.id === editingProductId);
+        const desiredOrder = Math.max(1, parseInt(String(formData.order), 10) || 1);
+
+        if (desiredOrder !== (existingProduct?.order || 1)) {
+          const reorderRes = reorderProductPosition(editingProductId, desiredOrder);
+          if (reorderRes.swappedProduct) {
+            await swapProductOrdersInCloud(
+              { id: editingProductId, order: desiredOrder },
+              { id: reorderRes.swappedProduct.id, order: reorderRes.swappedProduct.order || 1 }
+            );
+          }
+        }
+
+        const parsedOriginalPrice = formData.originalPrice !== '' && !isNaN(Number(formData.originalPrice)) ? Number(formData.originalPrice) : undefined;
+        const parsedPrice = formData.price !== '' && !isNaN(Number(formData.price)) ? Number(formData.price) : undefined;
+
+        const updatedHistory = existingProduct?.priceHistory ? [...existingProduct.priceHistory] : [];
+        if (parsedPrice !== undefined && (!existingProduct?.price || existingProduct.price !== parsedPrice)) {
+          updatedHistory.push({
+            date: new Date().toISOString(),
+            price: parsedPrice,
+          });
+        }
+
+        const updates: Partial<Product> = {
+          title: trimmedTitle,
+          subtitle: formData.subtitle.trim(),
+          store: formData.store,
+          affiliateUrl: trimmedUrl,
+          category: resolvedCategory,
+          order: desiredOrder,
+          images: finalImages,
+          description: formData.description || '',
+          highlights: cleanHighlights,
+          badges: formData.badges,
+          isFeatured: formData.isFeatured,
+          isCollection: formData.isCollection,
+          collectionButtonText: trimmedCollectionBtn || undefined,
+          rating: Number(formData.rating) > 0 ? Number(formData.rating) : 4.9,
+          reviewCount: Number(formData.reviewCount) >= 0 && !isNaN(Number(formData.reviewCount)) ? Number(formData.reviewCount) : 384,
+          clicksCount: Number(formData.clicksCount) >= 0 && !isNaN(Number(formData.clicksCount)) ? Number(formData.clicksCount) : 1420,
+          updatedAt: new Date().toISOString(),
+        };
+
+        updates.originalPrice = parsedOriginalPrice;
+        updates.price = parsedPrice;
+        if (updatedHistory.length > 0) {
+          updates.priceHistory = updatedHistory;
+        } else if (existingProduct?.priceHistory) {
+          updates.priceHistory = existingProduct.priceHistory;
+        }
+
+        updateProduct(editingProductId, updates);
+        await updateProductInCloud(editingProductId, updates);
+        onShowToast('Produto atualizado e salvo na nuvem com sucesso!');
+      } else {
+        const currentStored = getStoredProducts();
+        const maxExistingOrder = currentStored.reduce((max, p) => Math.max(max, p.order || 0), 0);
+        const desiredOrder = Math.max(1, parseInt(String(formData.order), 10) || (maxExistingOrder + 1));
+        const conflicting = currentStored.find((p) => p.order === desiredOrder);
+
+        const parsedOriginalPrice = formData.originalPrice !== '' && !isNaN(Number(formData.originalPrice)) ? Number(formData.originalPrice) : undefined;
+        const parsedPrice = formData.price !== '' && !isNaN(Number(formData.price)) ? Number(formData.price) : undefined;
+
+        const newProductPayload: any = {
+          title: trimmedTitle,
+          subtitle: formData.subtitle.trim(),
+          store: formData.store,
+          affiliateUrl: trimmedUrl,
+          category: resolvedCategory,
+          order: desiredOrder,
+          images: finalImages,
+          description: formData.description || 'Descrição detalhada do achadinho.',
+          highlights: cleanHighlights.length > 0 ? cleanHighlights : ['Produto verificado', 'Envio rápido'],
+          badges: formData.badges,
+          isFeatured: formData.isFeatured,
+          isCollection: formData.isCollection,
+          collectionButtonText: trimmedCollectionBtn || undefined,
+          rating: Number(formData.rating) > 0 ? Number(formData.rating) : 4.9,
+          reviewCount: Number(formData.reviewCount) >= 0 && !isNaN(Number(formData.reviewCount)) ? Number(formData.reviewCount) : 384,
+          clicksCount: Number(formData.clicksCount) >= 0 && !isNaN(Number(formData.clicksCount)) ? Number(formData.clicksCount) : 1420,
+          verifiedDeal: true,
+        };
+
+        if (parsedOriginalPrice !== undefined) {
+          newProductPayload.originalPrice = parsedOriginalPrice;
+        }
+        if (parsedPrice !== undefined) {
+          newProductPayload.price = parsedPrice;
+          newProductPayload.priceHistory = [{ date: new Date().toISOString(), price: parsedPrice }];
+        }
+
+        const created = addProduct(newProductPayload);
+        await addProductToCloud(created);
+
+        // If another product had the same position, sync its bumped position to Firestore too
+        if (conflicting) {
+          const bumpedConflicting = getStoredProducts().find((p) => p.id === conflicting.id);
+          if (bumpedConflicting && bumpedConflicting.order !== conflicting.order) {
+            await updateProductInCloud(bumpedConflicting.id, { order: bumpedConflicting.order });
+          }
+        }
+
+        onShowToast('Novo produto cadastrado e salvo na nuvem com sucesso!');
+      }
+
+      resetForm();
+      onRefreshData();
+      setActiveTab('products');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      console.error('Erro ao gravar produto no Firestore:', err);
+      onRefreshData();
+      onShowToast('❌ Erro ao gravar produto na nuvem. Verifique os dados/conexão e tente novamente.');
+    } finally {
+      setIsSavingProduct(false);
+    }
   };
 
   const handleAddImageField = () => {
@@ -1569,15 +1641,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
 
-    if (result.targetProduct) {
-      await swapProductOrdersInCloud(
-        { id: product.id, order: newPositionRaw },
-        result.swappedProduct ? { id: result.swappedProduct.id, order: result.swappedProduct.order || currentPos } : undefined
-      );
-    }
+    try {
+      if (result.targetProduct) {
+        await swapProductOrdersInCloud(
+          { id: product.id, order: newPositionRaw },
+          result.swappedProduct ? { id: result.swappedProduct.id, order: result.swappedProduct.order || currentPos } : undefined
+        );
+      }
 
-    onRefreshData();
-    onShowToast(`✅ ${result.message}`);
+      onRefreshData();
+      onShowToast(`✅ ${result.message}`);
+    } catch (err) {
+      console.error('Erro ao atualizar posição:', err);
+      onRefreshData();
+      onShowToast('❌ Erro ao atualizar posição na nuvem. Tente novamente.');
+    }
   };
 
   const filteredProducts = [...products]
@@ -3561,10 +3639,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            updateProduct(p.id, { isFeatured: !p.isFeatured });
-                            updateProductInCloud(p.id, { isFeatured: !p.isFeatured });
-                            onRefreshData();
+                          onClick={async () => {
+                            try {
+                              updateProduct(p.id, { isFeatured: !p.isFeatured });
+                              await updateProductInCloud(p.id, { isFeatured: !p.isFeatured });
+                              onRefreshData();
+                            } catch (err) {
+                              console.error('Erro ao alterar destaque:', err);
+                              onRefreshData();
+                              onShowToast('❌ Erro ao atualizar destaque na nuvem.');
+                            }
                           }}
                           className={`px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-colors ${
                             p.isFeatured
@@ -3739,10 +3823,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                           <td className="py-3 px-4 text-center">
                             <button
-                              onClick={() => {
-                                updateProduct(p.id, { isFeatured: !p.isFeatured });
-                                updateProductInCloud(p.id, { isFeatured: !p.isFeatured });
-                                onRefreshData();
+                              onClick={async () => {
+                                try {
+                                  updateProduct(p.id, { isFeatured: !p.isFeatured });
+                                  await updateProductInCloud(p.id, { isFeatured: !p.isFeatured });
+                                  onRefreshData();
+                                } catch (err) {
+                                  console.error('Erro ao alterar destaque:', err);
+                                  onRefreshData();
+                                  onShowToast('❌ Erro ao atualizar destaque na nuvem.');
+                                }
                               }}
                               className={`px-2 py-0.5 rounded-full text-[11px] font-bold cursor-pointer ${
                                 p.isFeatured
@@ -3799,7 +3889,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {editingProductId ? 'Editar Informações do Produto' : 'Cadastrar Novo Achadinho'}
               </h2>
               <p className="text-xs text-slate-500">
-                Preencha os campos abaixo com as informações do parceiro oficial. Nenhum preço é exibido no site.
+                Preencha os campos abaixo com as informações da oferta oficial do parceiro.
               </p>
             </div>
             {editingProductId && (
@@ -3972,7 +4062,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 placeholder="Ex: 89.90 (preço com desconto)"
-                className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-semibold text-emerald-600"
+                className="w-full px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-orange-500 font-semibold text-emerald-700"
               />
               <p className="text-[11px] text-slate-400 mt-1">
                 Opcional. Exibe em destaque verde. Deixe vazio para remover/não exibir.
@@ -3998,6 +4088,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {formData.images.map((imgUrl, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-400 w-5">#{idx + 1}</span>
+                    {imgUrl.trim() && (
+                      <img
+                        src={imgUrl.trim()}
+                        alt={`Prévia ${idx + 1}`}
+                        referrerPolicy="no-referrer"
+                        className="w-9 h-9 rounded-lg object-cover border border-slate-200 bg-slate-100 shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.style.opacity = '0.25';
+                        }}
+                        onLoad={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                      />
+                    )}
                     <input
                       type="text"
                       value={imgUrl}
@@ -4248,10 +4352,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
             <button
               type="submit"
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 transition-all cursor-pointer text-center"
+              disabled={isSavingProduct}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 transition-all cursor-pointer text-center"
             >
-              <Check className="w-4 h-4" />
-              <span>{editingProductId ? 'Salvar Alterações' : 'Cadastrar Produto'}</span>
+              {isSavingProduct ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Salvando na nuvem...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>{editingProductId ? 'Salvar Alterações' : 'Cadastrar Produto'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

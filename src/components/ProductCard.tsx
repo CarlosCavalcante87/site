@@ -18,10 +18,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   isTopFeaturedArea = false,
 }) => {
   const storeConfig = STORE_CONFIG[product.store] || STORE_CONFIG.Outro;
-  const mainImage = product.images?.[0] || 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80';
+  const fallbackImage = 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80';
+  const mainImage = product.images?.[0]?.trim() || fallbackImage;
   const secondaryImage = (product.images && product.images.length > 1 && product.images[1]?.trim() && product.images[1].trim() !== mainImage)
     ? product.images[1].trim()
     : null;
+
+  const secondaryBadge = product.badges?.find((b) => b && b !== 'Destaque') || null;
+  const parsedPrice = product.price != null && product.price !== ('' as any) && !isNaN(Number(product.price)) ? Number(product.price) : null;
+  const parsedOriginalPrice = product.originalPrice != null && product.originalPrice !== ('' as any) && !isNaN(Number(product.originalPrice)) ? Number(product.originalPrice) : null;
+  const parsedRating = product.rating != null && !isNaN(Number(product.rating)) && Number(product.rating) > 0 ? Number(product.rating) : null;
+  const parsedReviewCount = product.reviewCount != null && !isNaN(Number(product.reviewCount)) && Number(product.reviewCount) > 0 ? Number(product.reviewCount) : null;
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (product.isCollection) {
@@ -66,7 +73,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           }`}
           onError={(e) => {
             const target = e.currentTarget;
-            target.src = 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80';
+            if (target.dataset.fallbackApplied) return;
+            target.dataset.fallbackApplied = '1';
+            target.src = fallbackImage;
           }}
         />
 
@@ -119,16 +128,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white" />
               <span>Destaque</span>
             </span>
-          ) : product.badges && product.badges.length > 0 && product.badges[0] !== 'Destaque' ? (
+          ) : secondaryBadge ? (
             <span className="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[11px] font-bold bg-slate-900/80 backdrop-blur-xs text-white">
-              {product.badges[0]}
+              {secondaryBadge}
             </span>
           ) : null}
 
-          {/* Secondary badge shown only on desktop (sm+) to avoid obscuring the mobile photo */}
-          {!product.isCollection && isTopFeaturedArea && product.badges && product.badges.length > 0 && product.badges[0] !== 'Destaque' && (
+          {/* Secondary badge shown on desktop (sm+) when another badge is already at top right */}
+          {!product.isCollection && (isTopFeaturedArea || product.isFeatured) && secondaryBadge && (
             <span className="hidden sm:inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900/80 backdrop-blur-xs text-white">
-              {product.badges[0]}
+              {secondaryBadge}
             </span>
           )}
         </div>
@@ -161,32 +170,32 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       {/* Card Content Area */}
-      <div className="p-2 sm:p-4 flex-1 flex flex-col justify-between">
+      <div className={`${isTopFeaturedArea ? 'p-2.5 sm:p-4' : 'p-3.5 sm:p-4'} flex-1 flex flex-col justify-between`}>
         <div>
           {/* Metadata Row: Category, Secondary Promo Tag & Social Proof */}
           <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-500 mb-1 sm:mb-1.5 gap-1">
             <div className="flex items-center gap-1 min-w-0">
               <span className="font-semibold text-orange-600 truncate mr-0.5">{product.category}</span>
               {/* Mobile badge indicator when multiple badges exist, cleanly placed below image */}
-              {(isTopFeaturedArea || product.isCollection) && product.badges && product.badges.length > 0 && product.badges[0] !== 'Destaque' && (
+              {(isTopFeaturedArea || product.isCollection || product.isFeatured) && secondaryBadge && (
                 <span className="sm:hidden px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-600 shrink-0">
-                  {product.badges[0]}
+                  {secondaryBadge}
                 </span>
               )}
             </div>
-            {product.rating && (
+            {parsedRating !== null && (
               <div className="flex items-center gap-1 text-slate-600 font-medium shrink-0">
                 <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-amber-400 text-amber-400" />
-                <span className="tabular-nums">{product.rating}</span>
-                {product.reviewCount && (
-                  <span className="text-slate-400 text-[10px] sm:text-[11px]">({product.reviewCount})</span>
+                <span className="tabular-nums">{parsedRating}</span>
+                {parsedReviewCount !== null && (
+                  <span className="text-slate-400 text-[10px] sm:text-[11px]">({parsedReviewCount})</span>
                 )}
               </div>
             )}
           </div>
 
           {/* Product Title */}
-          <h3 className="font-bold text-slate-900 text-xs sm:text-base leading-snug line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-orange-600 transition-colors">
+          <h3 className={`font-bold text-slate-900 ${isTopFeaturedArea ? 'text-xs sm:text-base' : 'text-sm sm:text-base'} leading-snug line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-orange-600 transition-colors`}>
             {product.title}
           </h3>
 
@@ -207,17 +216,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           )}
 
           {/* Price with strikethrough (Ancoragem / Desconto) */}
-          {(product.price != null || product.originalPrice != null) && (
+          {(parsedPrice !== null || parsedOriginalPrice !== null) && (
             <div className="mb-2 sm:mb-2.5 flex items-center gap-1.5 flex-wrap">
               <span className="shrink-0 text-xs sm:text-sm">💰</span>
-              {product.originalPrice != null && (
+              {parsedOriginalPrice !== null && (
                 <span className="text-slate-400 line-through text-[11px] sm:text-xs">
-                  De R$ {product.originalPrice.toFixed(2).replace('.', ',')}
+                  De R$ {parsedOriginalPrice.toFixed(2).replace('.', ',')}
                 </span>
               )}
-              {product.price != null && (
+              {parsedPrice !== null && (
                 <span className="font-black text-emerald-600 text-xs sm:text-sm">
-                  {product.originalPrice != null ? 'por ' : ''}R$ {product.price.toFixed(2).replace('.', ',')}
+                  {parsedOriginalPrice !== null ? 'por ' : ''}R$ {parsedPrice.toFixed(2).replace('.', ',')}
                 </span>
               )}
             </div>
@@ -230,34 +239,38 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <button
               type="button"
               onClick={(e) => onDirectStoreClick(product, e)}
-              className="w-full py-2.5 sm:py-3 px-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-indigo-500/25 transition-all cursor-pointer min-w-0"
+              className="w-full py-2 sm:py-3 px-2.5 sm:px-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-[11px] sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 shadow-md shadow-indigo-500/25 transition-all cursor-pointer min-w-0"
               title={`Explorar lista completa de recomendações em ${product.store}`}
             >
               <span className="truncate">{product.collectionButtonText || 'Explorar Lista de Recomendações'}</span>
-              <ExternalLink className="w-4 h-4 text-indigo-200 shrink-0" />
+              <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-200 shrink-0" />
             </button>
           </div>
         ) : (
-          <div className="pt-2 sm:pt-3 border-t border-slate-100 grid grid-cols-2 gap-1.5 sm:gap-2.5">
+          <div
+            className={`pt-2 sm:pt-3 border-t border-slate-100 grid gap-1.5 sm:gap-2.5 ${
+              isTopFeaturedArea ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2'
+            }`}
+          >
             {/* Primary View Action */}
             <button
               type="button"
               onClick={() => onOpenProduct(product)}
-              className={`w-full py-1.5 sm:py-2.5 px-1 sm:px-3 rounded-lg sm:rounded-xl font-bold text-[10px] sm:text-xs md:text-sm flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer min-w-0 ${
+              className={`w-full py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs md:text-sm flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer min-w-0 ${
                 isTopFeaturedArea
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-sm shadow-orange-500/25'
                   : 'bg-orange-50 hover:bg-orange-100 text-orange-700'
               }`}
             >
               <span className="whitespace-nowrap font-bold">Ver Detalhes</span>
-              <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             </button>
 
             {/* Direct Partner Store Shortcut */}
             <button
               type="button"
               onClick={(e) => onDirectStoreClick(product, e)}
-              className={`w-full py-1.5 sm:py-2.5 px-1 sm:px-3 rounded-lg sm:rounded-xl font-bold text-[10px] sm:text-xs md:text-sm flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer min-w-0 ${
+              className={`w-full py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs md:text-sm flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer min-w-0 ${
                 isTopFeaturedArea
                   ? 'bg-slate-900 hover:bg-black text-white hover:ring-2 hover:ring-orange-400'
                   : 'bg-slate-900 hover:bg-slate-800 text-white'
@@ -265,7 +278,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               title={`Atualizar preço direto no site oficial (${product.store})`}
             >
               <span className="whitespace-nowrap font-bold">Atualizar preço</span>
-              <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400 shrink-0" />
+              <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-400 shrink-0" />
             </button>
           </div>
         )}
