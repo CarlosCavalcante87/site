@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ExternalLink, Star, ArrowRight, Eye, Check, Layers } from 'lucide-react';
 import { Product } from '../types';
 import { STORE_CONFIG } from '../services/storage';
-import { StoreLogo } from './StoreLogo';
+import { StoreLogo, StoreImagePlaceholder } from './StoreLogo';
 
 interface ProductCardProps {
   product: Product;
@@ -29,6 +29,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const parsedOriginalPrice = product.originalPrice != null && product.originalPrice !== ('' as any) && !isNaN(Number(product.originalPrice)) ? Number(product.originalPrice) : null;
   const parsedRating = product.rating != null && !isNaN(Number(product.rating)) && Number(product.rating) > 0 ? Number(product.rating) : null;
   const parsedReviewCount = product.reviewCount != null && !isNaN(Number(product.reviewCount)) && Number(product.reviewCount) > 0 ? Number(product.reviewCount) : null;
+
+  const [mainImageLoaded, setMainImageLoaded] = useState(false);
+  const [secondaryImageLoaded, setSecondaryImageLoaded] = useState(false);
+  const mainImgRef = useRef<HTMLImageElement | null>(null);
+  const secondaryImgRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    setMainImageLoaded(false);
+    if (mainImgRef.current?.complete && mainImgRef.current.naturalWidth > 0) {
+      setMainImageLoaded(true);
+    }
+  }, [mainImage]);
+
+  useEffect(() => {
+    setSecondaryImageLoaded(false);
+    if (secondaryImgRef.current?.complete && secondaryImgRef.current.naturalWidth > 0) {
+      setSecondaryImageLoaded(true);
+    }
+  }, [secondaryImage]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (product.isCollection) {
@@ -60,35 +79,56 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       >
       {/* Image Area with Store & Status Badges */}
       <div className="relative aspect-4/3 bg-slate-100 overflow-hidden">
+        {/* Store Logo Preview while loading or if image fails */}
+        {!mainImageLoaded && <StoreImagePlaceholder store={product.store} />}
+
         {/* Primary Image */}
-        <img
-          src={mainImage}
-          alt={product.title}
-          referrerPolicy="no-referrer"
-          loading="lazy"
-          className={`w-full h-full object-cover transition-all duration-500 ease-out ${
-            secondaryImage 
-              ? 'group-hover:opacity-0 group-hover:scale-105' 
-              : 'group-hover:scale-105'
+        <div
+          className={`w-full h-full transition-opacity duration-300 ease-out ${
+            mainImageLoaded ? 'opacity-100' : 'opacity-0'
           }`}
-          onError={(e) => {
-            const target = e.currentTarget;
-            if (target.dataset.fallbackApplied) return;
-            target.dataset.fallbackApplied = '1';
-            target.src = fallbackImage;
-          }}
-        />
+        >
+          <img
+            ref={mainImgRef}
+            src={mainImage}
+            alt={product.title}
+            referrerPolicy="no-referrer"
+            decoding="async"
+            className={`w-full h-full object-cover transition-all duration-500 ease-out ${
+              secondaryImage && secondaryImageLoaded
+                ? 'group-hover:opacity-0 group-hover:scale-105'
+                : 'group-hover:scale-105'
+            }`}
+            onLoad={() => setMainImageLoaded(true)}
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.dataset.fallbackApplied) {
+                target.dataset.fallbackApplied = '1';
+                setMainImageLoaded(false);
+                target.src = fallbackImage;
+                return;
+              }
+              target.dataset.fallbackApplied = '2';
+              setMainImageLoaded(false);
+            }}
+          />
+        </div>
 
         {/* Secondary Image on Hover (if available) */}
         {secondaryImage && (
           <img
+            ref={secondaryImgRef}
             src={secondaryImage}
             alt={`${product.title} - foto 2`}
             referrerPolicy="no-referrer"
-            loading="lazy"
-            className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 ease-out pointer-events-none"
+            decoding="async"
+            className={`absolute inset-0 w-full h-full object-cover opacity-0 transition-all duration-500 ease-out pointer-events-none ${
+              secondaryImageLoaded ? 'group-hover:opacity-100 group-hover:scale-105' : ''
+            }`}
+            onLoad={() => setSecondaryImageLoaded(true)}
             onError={(e) => {
               const target = e.currentTarget;
+              setSecondaryImageLoaded(false);
               target.style.display = 'none';
             }}
           />

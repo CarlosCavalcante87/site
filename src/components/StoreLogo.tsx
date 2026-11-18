@@ -1,9 +1,10 @@
 import React from 'react';
 import { StoreType } from '../types';
+import { STORE_CONFIG } from '../services/storage';
 
 interface StoreLogoProps {
   store: StoreType | 'Todas';
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showName?: boolean;
   className?: string;
 }
@@ -22,6 +23,8 @@ export const StoreLogo: React.FC<StoreLogoProps> = ({
         return { iconSize: 'w-4 h-4', height: 'h-5' };
       case 'lg':
         return { iconSize: 'w-7 h-7', height: 'h-8' };
+      case 'xl':
+        return { iconSize: 'w-14 h-14 sm:w-16 sm:h-16', height: 'h-16' };
       case 'md':
       default:
         return { iconSize: 'w-5 h-5', height: 'h-6' };
@@ -104,7 +107,9 @@ export const StoreLogo: React.FC<StoreLogoProps> = ({
       case 'Shein':
         return (
           <div
-            className={`${iconSize} shrink-0 bg-black rounded-full flex items-center justify-center text-white font-black text-[9px] tracking-tighter shadow-2xs`}
+            className={`${iconSize} shrink-0 bg-black rounded-full flex items-center justify-center text-white font-black ${
+              size === 'xl' ? 'text-2xl' : size === 'lg' ? 'text-xs' : 'text-[9px]'
+            } tracking-tighter shadow-2xs`}
           >
             S
           </div>
@@ -166,7 +171,9 @@ export const StoreLogo: React.FC<StoreLogoProps> = ({
       default:
         return (
           <div
-            className={`${iconSize} shrink-0 bg-slate-200 rounded-full flex items-center justify-center text-slate-700 font-bold text-[9px]`}
+            className={`${iconSize} shrink-0 bg-slate-200 rounded-full flex items-center justify-center text-slate-700 font-bold ${
+              size === 'xl' ? 'text-2xl' : size === 'lg' ? 'text-sm' : 'text-[9px]'
+            }`}
           >
             🛍️
           </div>
@@ -181,5 +188,41 @@ export const StoreLogo: React.FC<StoreLogoProps> = ({
         <span className="font-bold text-xs truncate">{store}</span>
       )}
     </span>
+  );
+};
+
+interface StoreImagePlaceholderProps {
+  store: StoreType;
+  compact?: boolean;
+  className?: string;
+}
+
+export const StoreImagePlaceholder: React.FC<StoreImagePlaceholderProps> = ({
+  store,
+  compact = false,
+  className = '',
+}) => {
+  const config = STORE_CONFIG[store] || STORE_CONFIG.Outro;
+
+  return (
+    <div
+      style={{ backgroundColor: config.bg }}
+      className={`absolute inset-0 flex flex-col items-center justify-center p-3 select-none pointer-events-none ${className}`}
+      aria-hidden="true"
+    >
+      <div className={`flex flex-col items-center justify-center ${compact ? 'gap-1' : 'gap-2'}`}>
+        <div className="drop-shadow-xs">
+          <StoreLogo store={store} size={compact ? 'lg' : 'xl'} />
+        </div>
+        {!compact && (
+          <span
+            style={{ color: config.text }}
+            className="text-[11px] sm:text-xs font-extrabold tracking-tight opacity-90"
+          >
+            {config.name}
+          </span>
+        )}
+      </div>
+    </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -14,12 +14,59 @@ import {
   Maximize2,
   Layers
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, StoreType } from '../types';
 import { STORE_CONFIG, trackProductClick } from '../services/storage';
 import { trackCloudProductClick } from '../services/firebaseService';
-import { StoreLogo } from './StoreLogo';
+import { StoreLogo, StoreImagePlaceholder } from './StoreLogo';
 import { WhatsAppIcon } from './WhatsAppButton';
 import { PriceHistoryChart } from './PriceHistoryChart';
+
+const FALLBACK_PRODUCT_IMAGE =
+  'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80';
+
+const StoreThumbImage: React.FC<{
+  src: string;
+  alt: string;
+  store: StoreType;
+  className?: string;
+}> = ({ src, alt, store, className = 'w-full h-full object-cover' }) => {
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const resolvedSrc = src?.trim() || FALLBACK_PRODUCT_IMAGE;
+
+  useEffect(() => {
+    setLoaded(false);
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, [resolvedSrc]);
+
+  return (
+    <div className="relative w-full h-full bg-slate-100 overflow-hidden">
+      {!loaded && <StoreImagePlaceholder store={store} compact />}
+      <img
+        ref={imgRef}
+        src={resolvedSrc}
+        alt={alt}
+        referrerPolicy="no-referrer"
+        decoding="async"
+        className={`${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setLoaded(true)}
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (!target.dataset.fallbackApplied) {
+            target.dataset.fallbackApplied = '1';
+            setLoaded(false);
+            target.src = FALLBACK_PRODUCT_IMAGE;
+            return;
+          }
+          target.dataset.fallbackApplied = '2';
+          setLoaded(false);
+        }}
+      />
+    </div>
+  );
+};
 
 interface ProductDetailProps {
   product: Product;
@@ -39,6 +86,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+  const [mainImageLoaded, setMainImageLoaded] = useState(false);
+  const mainImgRef = useRef<HTMLImageElement | null>(null);
 
   // Touch swipe support for photo gallery
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -53,8 +102,15 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
   const storeConfig = STORE_CONFIG[product.store] || STORE_CONFIG.Outro;
   const images = product.images && product.images.length > 0
     ? product.images
-    : ['https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80'];
-  const activeImage = images[selectedImageIndex] || images[0];
+    : [FALLBACK_PRODUCT_IMAGE];
+  const activeImage = images[selectedImageIndex]?.trim() || images[0]?.trim() || FALLBACK_PRODUCT_IMAGE;
+
+  useEffect(() => {
+    setMainImageLoaded(false);
+    if (mainImgRef.current?.complete && mainImgRef.current.naturalWidth > 0) {
+      setMainImageLoaded(true);
+    }
+  }, [activeImage]);
 
   const handleNextPhoto = () => {
     setSelectedImageIndex((prev) => (prev + 1) % images.length);
@@ -152,14 +208,28 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
             onTouchMove={onGalleryTouchMove}
             onTouchEnd={onGalleryTouchEnd}
           >
+            {!mainImageLoaded && <StoreImagePlaceholder store={product.store} />}
             <img
+              key={activeImage}
+              ref={mainImgRef}
               src={activeImage}
               alt={product.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
+              decoding="async"
+              className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-102 ${
+                mainImageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              onLoad={() => setMainImageLoaded(true)}
               onError={(e) => {
                 const target = e.currentTarget;
-                target.src = 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80';
+                if (!target.dataset.fallbackApplied) {
+                  target.dataset.fallbackApplied = '1';
+                  setMainImageLoaded(false);
+                  target.src = FALLBACK_PRODUCT_IMAGE;
+                  return;
+                }
+                target.dataset.fallbackApplied = '2';
+                setMainImageLoaded(false);
               }}
             />
 
@@ -206,15 +276,10 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                       : 'border-slate-200 opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <img
+                  <StoreThumbImage
                     src={img}
                     alt={`Miniatura ${idx + 1}`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      target.src = 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80';
-                    }}
+                    store={product.store}
                   />
                 </button>
               ))}
@@ -444,15 +509,11 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                 className="bg-white rounded-2xl border border-slate-200 p-3 hover:border-orange-300 hover:shadow-md transition-all cursor-pointer flex gap-4 group"
               >
                 <div className="w-24 h-24 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                  <img
+                  <StoreThumbImage
                     src={rel.images[0]}
                     alt={rel.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      target.src = 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80';
-                    }}
+                    store={rel.store}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
                 <div className="flex-1 flex flex-col justify-between py-0.5">
